@@ -10,11 +10,11 @@ import (
 	"math/rand"
 	"os"
 	"time"
+        "flag"
 
 	"gitlab.com/wmlph/poloniex-api"
 )
 
-const APPNAME = "HastyPoloniexBot"
 
 type coinstate struct {
 	Coin           string
@@ -33,6 +33,7 @@ var (
 	conf     *viper.Viper
 	exchange *poloniex.Poloniex
 	state    map[string]*coinstate
+        BotName = "HastyPoloniexBot"
 
 //         state *viper.Viper
 
@@ -65,20 +66,19 @@ func LogInit(output string) {
 		log.Ldate|log.Ltime|log.Lshortfile)
 }
 
-func ConfInit() {
+func ConfInit(config string) {
 	// CONF
 	conf = viper.New()
 	conf.SetConfigType("toml")
 	conf.AddConfigPath(".")
-	conf.SetConfigName("config") // name of config file (without extension)
+	conf.SetConfigName(config) // name of config file (without extension)
 	// set defaults here
 	//
 	err := conf.ReadInConfig() // Find and read the config file
 	if err != nil {            // Handle errors reading the config file
 		panic(fmt.Errorf("Fatal error reading config file: %s \n", err))
 	}
-	Info.Println("Loaded config file")
-
+	
 	// STATE
 	state = make(map[string]*coinstate)
 	statefile := conf.GetString("DataStore.filename")
@@ -101,7 +101,6 @@ func ConfInit() {
 		}
 	}
 	// all ok
-	Info.Println("Loaded state information")
 
 }
 
@@ -123,10 +122,18 @@ func init() {
 }
 
 func main() {
-	LogInit(APPNAME + ".log")
-	Info.Println("STARTING " + APPNAME)
+        var config string
+        flag.StringVar(&config , "config", "config", "config file to use")
+        flag.Parse()
+    
+	ConfInit(config)
+	BotName=conf.GetString("BotControl.botname")
+        LogInit(BotName + ".log")
+	Info.Println("STARTING " + BotName)
+//       	Info.Println("Loaded config file")
+//	Info.Println("Loaded state information")
+
 	// load config file
-	ConfInit()
 	defer store(state) // make sure state info is saved when program terminates
 
 	if conf.GetBool("BotControl.Active") == false {

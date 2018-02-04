@@ -94,7 +94,7 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 	}
 
 	purchaseprice := state[coin].PurchasePrice
-	
+
 	currentprice := c[0] // need a better indicator
 	maxlosstorisk := conf.GetFloat64("TradingRules.maxlosstorisk")
 	percentloss := (currentprice - purchaseprice) / currentprice

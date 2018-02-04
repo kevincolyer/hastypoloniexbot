@@ -21,9 +21,9 @@ func Buy(base, coin string, price, amount float64) {
 		// assume a buy completes (to make simulation work!)
 		state["LAST"].Coin = coin
 		state[coin].PurchasePrice = price
-		value:=price*amount
-		amountafterfees:=value*(1-conf.GetFloat64("TradingRules.buyfee"))/price
-		
+		value := price * amount
+		amountafterfees := value * (1 - conf.GetFloat64("TradingRules.buyfee")) / price
+
 		state[coin].Balance += amountafterfees
 		// TODO update date
 		state[base].Balance -= value
@@ -48,8 +48,8 @@ func Sell(base, coin string, price, amount float64) {
 		state["LAST"].Coin = base
 		state[coin].PurchasePrice = price
 		//value:=price*amount
-		valueafterfees:=price*(1-conf.GetFloat64("TradingRules.sellfee"))*amount
-		
+		valueafterfees := price * (1 - conf.GetFloat64("TradingRules.sellfee")) * amount
+
 		state[coin].Balance -= amount
 		// TODO update date
 		state[base].Balance -= valueafterfees

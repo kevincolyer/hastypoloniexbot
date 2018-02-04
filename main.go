@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"github.com/spf13/viper"
 	"io"
@@ -9,12 +10,12 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"strings"
 	"time"
-        "flag"
+        "sort"
 
 	"gitlab.com/wmlph/poloniex-api"
 )
-
 
 type coinstate struct {
 	Coin           string
@@ -33,7 +34,7 @@ var (
 	conf     *viper.Viper
 	exchange *poloniex.Poloniex
 	state    map[string]*coinstate
-        BotName = "HastyPoloniexBot"
+	BotName  = "HastyPoloniexBot"
 
 //         state *viper.Viper
 
@@ -78,13 +79,13 @@ func ConfInit(config string) {
 	if err != nil {            // Handle errors reading the config file
 		panic(fmt.Errorf("Fatal error reading config file: %s \n", err))
 	}
-	
+
 	// STATE
 	state = make(map[string]*coinstate)
 	statefile := conf.GetString("DataStore.filename")
 	if _, err := os.Stat(statefile); os.IsNotExist(err) {
 		// defaults
-		state[conf.GetString("Currency.Base")] = &coinstate{Balance: 0.1,Coin:"BTC"}
+		state[conf.GetString("Currency.Base")] = &coinstate{Balance: 0.1, Coin: "BTC"}
 		state[conf.GetString("Currency.Target")] = &coinstate{}
 		state["LAST"] = &coinstate{Coin: "BTC"}
 		store(state)
@@ -114,24 +115,30 @@ func store(s map[string]*coinstate) {
 	if err != nil {
 		panic(fmt.Errorf("Fatal error writing state file: %s \n", err))
 	}
-	Info.Println("Stored state information")
+	// 	Info.Println("Stored state information")
 }
 
 func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 }
 
+type coinaction struct {
+	coin    string
+	action  int
+	ranking float64
+}
+
 func main() {
-        var config string
-        flag.StringVar(&config , "config", "config", "config file to use")
-        flag.Parse()
-    
+	var config string
+	flag.StringVar(&config, "config", "config", "config file to use")
+	flag.Parse()
+
 	ConfInit(config)
-	BotName=conf.GetString("BotControl.botname")
-        LogInit(BotName + ".log")
+	BotName = conf.GetString("BotControl.botname")
+	LogInit(BotName + ".log")
 	Info.Println("STARTING " + BotName)
-//       	Info.Println("Loaded config file")
-//	Info.Println("Loaded state information")
+	//       	Info.Println("Loaded config file")
+	//	Info.Println("Loaded state information")
 
 	// load config file
 	defer store(state) // make sure state info is saved when program terminates
@@ -155,75 +162,84 @@ func main() {
 	Info.Println("Getting Poloniex data")
 
 	exchange = poloniex.NewKS("blah", "blah")
-        
-        // Ticker
+
+	// Ticker
 	ticker, err := exchange.Ticker()
-	if err!=nil {
-            Error.Printf("Fatal error getting ticker data from poloniex: %v\n",err)
-            return
-        }
-        // {Last, Ask, Bid,Change,BaseVolume,QuoteVolume,IsFrozen}
-        fiat:=conf.GetString("Currency.Fiat")
-	coin:=conf.GetString("Currency.Target")
-        base:=conf.GetString("Currency.Base")
-        FIATBTC := ticker[fiat+"_BTC"].Last // can be other curency than usdt
-        
-        // use state if simulating, otherwise use real poloniex balance
-        basebalance:=state[base].Balance
-        coinbalance:=state[coin].Balance
-        /*if conf.GetBool("BotControl.Simulate") {
-        }*/
-        // else {
-        
-//         // Balances
-//         balances, err := exchange.BalancesAll()
-// 	if err != nil {
-// 		Error.Printf("Failed to get poloniex balances: %v\n",err))
-// 		return
-// 	}
-//}
-	// get and summarise all balances - update state
-// 	total:=0.0
-        
-        Info.Printf("BALANCE %v %v (%v %v) \n",fc(basebalance),base,fc(basebalance*FIATBTC),fiat)
-        Info.Printf("BALANCE %v %v (%v %v) \n",fc(coinbalance),coin,fc(ticker[base+"_"+coin].Last*coinbalance*FIATBTC),fiat)
-	
+	if err != nil {
+		Error.Printf("Fatal error getting ticker data from poloniex: %v\n", err)
+		return
+	}
+	// {Last, Ask, Bid,Change,BaseVolume,QuoteVolume,IsFrozen}
+	fiat := conf.GetString("Currency.Fiat")
+	base := conf.GetString("Currency.Base")
+	basebalance := state[base].Balance
+	FIATBTC := ticker[fiat+"_BTC"].Last // can be other curency than usdt
+	Info.Printf("BALANCE %v %v (%v %v) \n", fc(basebalance), base, fc(basebalance*FIATBTC), fiat)
+
+	coin := conf.GetString("Currency.Target")
+	//////////////////////////////////////
+	// MULTICOIN VARIANT
+	targets := strings.Split(conf.GetString("Currency.targets"), ",")
+	if len(targets) == 0 {
+		targets[0] = coin
+	}
+	var coinbalance float64
+	for _, coin = range targets {
+                if _,ok:=state[coin]; !ok {
+                    state[coin]=&coinstate{Coin:coin,Balance:0.0}
+                    
+                }
+                coinbalance=state[coin].Balance
+		Info.Printf("BALANCE %v %v (%v %v) \n", fc(coinbalance), coin, fc(ticker[base+"_"+coin].Last*coinbalance*FIATBTC), fiat)
+	}
+        ////////////////////////////////////////////
 	// Analyse coins
 	Info.Println("Analysing Data")
-	action, ranking := Analyse(coin)
-	//         fmt.Println(action,ranking)
-
-	Info.Println("Cancelling all Open Orders")
-
-	if action == BUY {
-		if ranking >= 0 {
-			// best ranking?
-		}
-		// check enough balance to make an order (minorder)
-		// get current asking price
-                minbalance:=conf.GetFloat64("TradingRules.minbasetotrade")
-                if basebalance>minbalance {
-                    Info.Println("Placing BUY  order")
-                    Buy(base, coin, ticker[base+"_"+coin].Ask,basebalance)
-                    
-                } else {
-                    Info.Printf("Balance of %v is lower (%v) than minbasetotrade rule (%v) Can't place buy order\n",base,fc(basebalance),fc(minbalance))
-                }
+	var todo []coinaction
+	
+	for _, coin = range targets {
+		action, ranking := Analyse(coin)
+		todo = append(todo, coinaction{coin: coin, action: action, ranking: ranking})
 	}
-// 	Info.Println("Placing FORCED BUY  order")
-//         Buy(base, coin, ticker[base+"_"+coin].Ask,basebalance)
-                    
-	if action == SELL {
-                // get current bidding price
-                // get balance and sell all
-		Info.Println("Placing SELL order")
-                Sell(base, coin,  ticker[base+"_"+coin].Bid,coinbalance)
-                
-            
-        }
-	if action == NOACTION {
+	// sort by ranking descending
+	sort.Slice(todo, func(i, j int) bool { return todo[i].ranking > todo[j].ranking })
 
-		Info.Println("Nothing to do")
+        ///////////////////////////////////////////
+	Info.Println("Cancelling all Open Orders")
+        
+        ///////////////////////////////////////////
+        // buying and selling for each coin
+	for i, _ := range todo {
+		coin = todo[i].coin
+		coinbalance := state[coin].Balance
+		action:= todo[i].action
+	
+                if action == BUY {
+			// check enough balance to make an order (minorder)
+			// get current asking price
+			minbalance := conf.GetFloat64("TradingRules.minbasetotrade")
+			if basebalance > minbalance {
+				Info.Println(coin + " Placing BUY  order")
+				Buy(base, coin, ticker[base+"_"+coin].Ask, basebalance)
+
+			} else {
+				Info.Printf("Balance of %v is lower (%v) than minbasetotrade rule (%v) Can't place buy order\n", base, fc(basebalance), fc(minbalance))
+			}
+		}
+		// 	Info.Println("Placing FORCED BUY  order")
+		//         Buy(base, coin, ticker[base+"_"+coin].Ask,basebalance)
+
+		if action == SELL {
+			// get current bidding price
+			// get balance and sell all
+			Info.Println(coin + " Placing SELL order")
+			Sell(base, coin, ticker[base+"_"+coin].Bid, coinbalance)
+
+		}
+		if action == NOACTION {
+
+			Info.Print(coin + " Nothing to do")
+		}
 	}
 	////////////////////////////////////
 }

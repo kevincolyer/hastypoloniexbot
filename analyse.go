@@ -61,14 +61,14 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 	last := state["LAST"].Coin
 	advice = NOACTION
 	anal := "ANAL "
-	Info.Printf(anal+"Currently holding %v %v\n", balance, coin)
+	Info.Printf(anal+"Currently holding %v %v\n", fc(balance), coin)
 	direction := coin
 	if diff >= 0 {
 		direction += " rising"
 	} else {
 		direction += " falling"
 	}
-	Info.Printf(anal+"%v: sma(%v): %v ema(%v): %v diff: %v\n", direction, smaperiods, sma, emaperiods, ema, diff)
+	Info.Printf(anal+"%v: sma(%v): %v ema(%v): %v diff: %v\n", direction, smaperiods, fc(sma), emaperiods, fc(ema), fc(diff))
 
 	if balance == 0 {
 		// if last coin sold is this coin then do nothing (cooling off period)
@@ -81,21 +81,22 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 			Info.Printf(anal + "ema is less than sma - coin trending down not a good buy\n")
 			return
 		}
-		triggerbuy := conf.GetFloat64("Analysis.triggerbuy")
+		triggerbuy := conf.GetFloat64("TradingRules.triggerbuy")
 		ranking = diff / sma
 		if ema > sma && ranking < triggerbuy {
-			Info.Printf(anal+"ema greater than sma but not by triggerbuy limit:%v (%v)\n", ranking, triggerbuy)
+			Info.Printf(anal+"ema greater than sma but not by triggerbuy limit:%v %% (%v %%)\n", fp(ranking), fp(triggerbuy))
 			return
 
 		}
 		advice = BUY
-		Info.Printf(anal+"Recommend BUY %v ranking %v\n", coin, ranking)
+		Info.Printf(anal+"Recommend BUY %v ranking %v\n", coin, fp(ranking))
 		return
 	}
 
 	purchaseprice := state[coin].PurchasePrice
-	currentprice := c[0]
-	maxlosstorisk := conf.GetFloat64("Analysis.maxlosstorisk")
+	
+	currentprice := c[0] // need a better indicator
+	maxlosstorisk := conf.GetFloat64("TradingRules.maxlosstorisk")
 	percentloss := (currentprice - purchaseprice) / currentprice
 	if percentloss > 0 {
 		percentloss = 0
@@ -103,13 +104,13 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 	// possible sell if trending down
 	if balance > 0 && ema < sma {
 		// curent price < purchase price-allowable loss the advice = sell
-		if percentloss < 0 && percentloss < maxlosstorisk {
+		if percentloss < 0 && -percentloss > maxlosstorisk {
 			advice = SELL
-			Info.Printf(anal+"Recommend SELL as loss %v is less than maxlosstorisk %v\n", percentloss, maxlosstorisk)
+			Info.Printf(anal+"Recommend SELL as loss %v %% is less than maxlosstorisk %v %%\n", fp(percentloss), fp(maxlosstorisk))
 			return
 		}
 		if percentloss < 0 {
-			Warning.Printf(anal+"Price is %v %% below purchase price but not at maxlosstorisk %v\n", percentloss*100, maxlosstorisk)
+			Warning.Printf(anal+"Price is %v %% below purchase price but not at maxlosstorisk %v %%\n", fp(percentloss), fp(maxlosstorisk))
 			return
 		}
 		// current price > purchase price info - keep - coin is growing in value
@@ -120,10 +121,10 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 		// current price > purchase price + max allowed growth - sell (get out on top)
 
 	}
-	maxgrowth := conf.GetFloat64("Analysis.maxgrowth")
+	maxgrowth := conf.GetFloat64("TradingRules.maxgrowth")
 	growth := currentprice - purchaseprice/purchaseprice
 	if balance > 0 && growth > maxgrowth {
-		Info.Printf(anal+"SELL: Coin is %v times greater than purchase price - triggered maxgrowth %v\n", growth, maxgrowth)
+		Info.Printf(anal+"SELL: Coin is %v times greater than purchase price - triggered maxgrowth %v\n", fn(growth), fn(maxgrowth))
 		advice = SELL
 		return
 	}

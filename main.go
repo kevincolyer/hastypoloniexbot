@@ -17,11 +17,13 @@ import (
 const APPNAME = "HastyPoloniexBot"
 
 type coinstate struct {
-	Coin          string
-	Balance       float64
-	Date          time.Time
-	PurchasePrice float64
-	OrderNumber   string
+	Coin           string
+	Balance        float64
+	Date           time.Time
+	PurchasePrice  float64
+	PurchaseAmount float64
+	OrderNumber    string
+	FiatValue      float64
 }
 
 var (
@@ -82,7 +84,7 @@ func ConfInit() {
 	statefile := conf.GetString("DataStore.filename")
 	if _, err := os.Stat(statefile); os.IsNotExist(err) {
 		// defaults
-		state[conf.GetString("Currency.Base")] = &coinstate{Balance: 0.1}
+		state[conf.GetString("Currency.Base")] = &coinstate{Balance: 0.1,Coin:"BTC"}
 		state[conf.GetString("Currency.Target")] = &coinstate{}
 		state["LAST"] = &coinstate{Coin: "BTC"}
 		store(state)
@@ -146,11 +148,42 @@ func main() {
 	Info.Println("Getting Poloniex data")
 
 	exchange = poloniex.NewKS("blah", "blah")
-	// 	ticker, _ := exchange.Ticker()
-	// 	fmt.Println(ticker)
-
+        
+        // Ticker
+	ticker, err := exchange.Ticker()
+	if err!=nil {
+            Error.Printf("Fatal error getting ticker data from poloniex: %v\n",err)
+            return
+        }
+        // {Last, Ask, Bid,Change,BaseVolume,QuoteVolume,IsFrozen}
+        fiat:=conf.GetString("Currency.Fiat")
+	coin:=conf.GetString("Currency.Target")
+        base:=conf.GetString("Currency.Base")
+        FIATBTC := ticker[fiat+"_BTC"].Last // can be other curency than usdt
+        
+        // use state if simulating, otherwise use real poloniex balance
+        basebalance:=state[base].Balance
+        coinbalance:=state[coin].Balance
+        /*if conf.GetBool("BotControl.Simulate") {
+        }*/
+        // else {
+        
+//         // Balances
+//         balances, err := exchange.BalancesAll()
+// 	if err != nil {
+// 		Error.Printf("Failed to get poloniex balances: %v\n",err))
+// 		return
+// 	}
+//}
+	// get and summarise all balances - update state
+// 	total:=0.0
+        
+        Info.Printf("BALANCE %v %v (%v %v) \n",fc(basebalance),base,fc(basebalance*FIATBTC),fiat)
+        Info.Printf("BALANCE %v %v (%v %v) \n",fc(coinbalance),coin,fc(ticker[base+"_"+coin].Last*coinbalance*FIATBTC),fiat)
+	
+	// Analyse coins
 	Info.Println("Analysing Data")
-	action, ranking := Analyse(conf.GetString("Currency.Target"))
+	action, ranking := Analyse(coin)
 	//         fmt.Println(action,ranking)
 
 	Info.Println("Cancelling all Open Orders")
@@ -159,13 +192,28 @@ func main() {
 		if ranking >= 0 {
 			// best ranking?
 		}
-		Info.Println("Placing BUY  order")
-		Buy("BTC", "STR", 0.001, 3)
+		// check enough balance to make an order (minorder)
+		// get current asking price
+                minbalance:=conf.GetFloat64("TradingRules.minbasetotrade")
+                if basebalance>minbalance {
+                    Info.Println("Placing BUY  order")
+                    Buy(base, coin, ticker[base+"_"+coin].Ask,basebalance)
+                    
+                } else {
+                    Info.Printf("Balance of %v is lower (%v) than minbasetotrade rule (%v) Can't place buy order\n",base,fc(basebalance),fc(minbalance))
+                }
 	}
+// 	Info.Println("Placing FORCED BUY  order")
+//         Buy(base, coin, ticker[base+"_"+coin].Ask,basebalance)
+                    
 	if action == SELL {
-
+                // get current bidding price
+                // get balance and sell all
 		Info.Println("Placing SELL order")
-	}
+                Sell(base, coin,  ticker[base+"_"+coin].Bid,coinbalance)
+                
+            
+        }
 	if action == NOACTION {
 
 		Info.Println("Nothing to do")

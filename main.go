@@ -181,9 +181,12 @@ func main() {
 	// MULTICOIN VARIANT
 	targets := strings.Split(conf.GetString("Currency.targets"), ",")
 	if len(targets) == 0 {
-		targets[0] = coin
+		targets=append(targets,coin)
 	}
 	var coinbalance float64
+	basetotal:=basebalance
+	var fragmenttotal float64
+	
 	for _, coin = range targets {
                 if _,ok:=state[coin]; !ok {
                     state[coin]=&coinstate{Coin:coin,Balance:0.0}
@@ -191,7 +194,13 @@ func main() {
                 }
                 coinbalance=state[coin].Balance
 		Info.Printf("BALANCE %v %v (%v %v) \n", fc(coinbalance), coin, fc(ticker[base+"_"+coin].Last*coinbalance*FIATBTC), fiat)
+                if coinbalance>0 { 
+                    fragmenttotal ++ 
+                    basetotal+=coinbalance*ticker[base+"_"+coin].Last
+                }
 	}
+	Info.Printf("BALANCE Total %v %v over %v coins",fc(basetotal),base, fragmenttotal)
+        
         ////////////////////////////////////////////
 	// Analyse coins
 	Info.Println("Analysing Data")
@@ -206,28 +215,39 @@ func main() {
 
         ///////////////////////////////////////////
 	Info.Println("Cancelling all Open Orders")
+        // TODO
+        
         
         ///////////////////////////////////////////
         // buying and selling for each coin
+        minbasetotrade := conf.GetFloat64("TradingRules.minbasetotrade")
+        maxfragments:=conf.GetFloat64("TradingRules.fragments")
+        if maxfragments==0 { maxfragments = 1}
+        
 	for i, _ := range todo {
 		coin = todo[i].coin
 		coinbalance := state[coin].Balance
 		action:= todo[i].action
-	
-                if action == BUY {
+		basebalance:=state[base].Balance
+                if action == BUY && coinbalance>0 {
+                    Info.Printf(coin+" BUY cannot proceed as already hold %v\n",fc(coinbalance))
+                }
+                if action == BUY && coinbalance==0 {
 			// check enough balance to make an order (minorder)
 			// get current asking price
-			minbalance := conf.GetFloat64("TradingRules.minbasetotrade")
-			if basebalance > minbalance {
+                        
+			if basebalance > minbasetotrade {
 				Info.Println(coin + " Placing BUY  order")
+                                if fragmenttotal < maxfragments && basebalance > minbasetotrade*2 {
+                                    fragmenttotal++
+                                    basebalance=basebalance*(fragmenttotal/maxfragments)
+                                }
 				Buy(base, coin, ticker[base+"_"+coin].Ask, basebalance)
 
 			} else {
-				Info.Printf("Balance of %v is lower (%v) than minbasetotrade rule (%v) Can't place buy order\n", base, fc(basebalance), fc(minbalance))
+				Info.Printf("Balance of %v is lower (%v) than minbasetotrade rule (%v) Can't place buy order\n", base, fc(basebalance), fc(minbasetotrade))
 			}
 		}
-		// 	Info.Println("Placing FORCED BUY  order")
-		//         Buy(base, coin, ticker[base+"_"+coin].Ask,basebalance)
 
 		if action == SELL {
 			// get current bidding price
@@ -241,5 +261,6 @@ func main() {
 			Info.Print(coin + " Nothing to do")
 		}
 	}
+//	Sell(base,"STR",ticker["BTC_STR"].Bid, state["STR"].Balance)
 	////////////////////////////////////
 }

@@ -11,6 +11,11 @@ func fp(p float64) (s string) {
 	return
 }
 
+// format as percentage *100 make int 2 decimal places
+func fp2(p float64) (s string) {
+	s = fmt.Sprintf("%.2f", p*100)
+	return
+}
 // format number
 func fn(a float64) (s string) {
 	s = fmt.Sprintf("%.8f", a)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"math/rand"
+        "time"
 )
 
 func SellSellSell() {
@@ -11,7 +12,7 @@ func SellSellSell() {
 	}
 }
 
-func Buy(base, coin string, price, amount float64) {
+func Buy(base, coin string, price, basebalance float64) {
 	if conf.GetBool("BotControl.Simulate") {
 		Info.Println("Simulating buy order")
 		if rand.Intn(20) == 0 {
@@ -19,24 +20,29 @@ func Buy(base, coin string, price, amount float64) {
 			return
 		}
 		// assume a buy completes (to make simulation work!)
+		if state[base].Balance<basebalance { 
+                    Warning.Print("Logic error - base balance is too low to actually purchase a coin!")
+                    return 
+                }
 		state["LAST"].Coin = coin
 		state[coin].PurchasePrice = price
-		value := price * amount
-		amountafterfees := value * (1 - conf.GetFloat64("TradingRules.buyfee")) / price
+		coinbalance := basebalance*(1 - conf.GetFloat64("TradingRules.buyfee"))/price
+		
 
-		state[coin].Balance += amountafterfees
+		state[coin].Balance += coinbalance
+		state[coin].Date = time.Now()
 		// TODO update date
-		state[base].Balance -= value
+		state[base].Balance -= basebalance
 		// TODO update date
 		if state[base].Balance < 0 {
 			state[base].Balance = 0
 		}
-		Info.Printf("Order placed for %v of %v at %v (paid %v %v)\n", fn(amountafterfees), coin, fc(price), fc(value), base)
+		Info.Printf("Order placed for %v of %v at %v (paid %v %v)\n", fc(coinbalance), coin, fc(price), fc(basebalance), base)
 		return
 	}
 }
 
-func Sell(base, coin string, price, amount float64) {
+func Sell(base, coin string, price, coinbalance float64) {
 	if conf.GetBool("BotControl.Simulate") {
 		Info.Println("Simulating Sell order")
 
@@ -47,17 +53,17 @@ func Sell(base, coin string, price, amount float64) {
 		// assume a sale completes (to make simulation work!)
 		state["LAST"].Coin = base
 		state[coin].PurchasePrice = price
-		//value:=price*amount
-		valueafterfees := price * (1 - conf.GetFloat64("TradingRules.sellfee")) * amount
+		//value:=price*coinbalance
+		valueafterfees := price * (1 - conf.GetFloat64("TradingRules.sellfee")) * coinbalance
 
-		state[coin].Balance -= amount
+		state[coin].Balance -= coinbalance
 		// TODO update date
-		state[base].Balance -= valueafterfees
+		state[base].Balance += valueafterfees
 		// TODO update date
 		if state[coin].Balance < 0 {
 			state[coin].Balance = 0
 		}
-		Info.Printf("Sell Order placed for %v of %v at %v (paid %v %v)\n", fn(amount), coin, fc(price), fc(valueafterfees), base)
+		Info.Printf("Sell Order placed for %v of %v at %v (received %v %v)\n", fc(coinbalance), coin, fc(price), fc(valueafterfees), base)
 		return
 	}
 }

@@ -84,12 +84,12 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 		triggerbuy := conf.GetFloat64("TradingRules.triggerbuy")
 		ranking = diff / sma
 		if ema > sma && ranking < triggerbuy {
-			Info.Printf(anal+"ema greater than sma but not by triggerbuy limit:%v %% (%v %%)\n", fp(ranking), fp(triggerbuy))
+			Info.Printf(anal+"ema greater than sma but not by triggerbuy limit:%v %% (%v %%)\n", fp2(ranking), fp2(triggerbuy))
 			return
 
 		}
-		advice = BUY
-		Info.Printf(anal+"Recommend BUY %v ranking %v\n", coin, fp(ranking))
+		advice = BUY // only recommended as  balance ==0 
+		Info.Printf(anal+"Recommend BUY %v ranking %v above triggerbuy %v\n", coin, fp2(ranking),fp2(triggerbuy))
 		return
 	}
 
@@ -128,6 +128,7 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 		advice = SELL
 		return
 	}
+	// TODO held coin for too long (max time) e.g. 24hours
 	Info.Print(anal + "Nothing to do. No concerns")
 	return
 }

@@ -2,7 +2,7 @@ package main
 
 import (
 	"math/rand"
-        "time"
+	"time"
 )
 
 func SellSellSell() {
@@ -20,16 +20,16 @@ func Buy(base, coin string, price, basebalance float64) {
 			return
 		}
 		// assume a buy completes (to make simulation work!)
-		if state[base].Balance<basebalance { 
-                    Warning.Print("Logic error - base balance is too low to actually purchase a coin!")
-                    return 
-                }
-		state["LAST"].Coin = coin
+		if state[base].Balance < basebalance {
+			Warning.Print("Logic error - base balance is too low to actually purchase a coin!")
+			return
+		}
+		state[LAST].Coin = coin
 		state[coin].PurchasePrice = price
-		coinbalance := basebalance*(1 - conf.GetFloat64("TradingRules.buyfee"))/price
-		
+		coinbalance := basebalance * (1 - conf.GetFloat64("TradingRules.buyfee")) / price
 
 		state[coin].Balance += coinbalance
+		state[coin].Coin = coin
 		state[coin].Date = time.Now()
 		// TODO update date
 		state[base].Balance -= basebalance
@@ -51,7 +51,7 @@ func Sell(base, coin string, price, coinbalance float64) {
 			return
 		}
 		// assume a sale completes (to make simulation work!)
-		state["LAST"].Coin = base
+		state[LAST].Coin = base
 		state[coin].PurchasePrice = price
 		//value:=price*coinbalance
 		valueafterfees := price * (1 - conf.GetFloat64("TradingRules.sellfee")) * coinbalance
@@ -63,6 +63,7 @@ func Sell(base, coin string, price, coinbalance float64) {
 		if state[coin].Balance < 0 {
 			state[coin].Balance = 0
 		}
+
 		Info.Printf("Sell Order placed for %v of %v at %v (received %v %v)\n", fc(coinbalance), coin, fc(price), fc(valueafterfees), base)
 		return
 	}

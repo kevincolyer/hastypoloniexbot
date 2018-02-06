@@ -16,9 +16,16 @@ func fp2(p float64) (s string) {
 	s = fmt.Sprintf("%.2f", p*100)
 	return
 }
+
 // format number
 func fn(a float64) (s string) {
 	s = fmt.Sprintf("%.8f", a)
+	return
+}
+
+// as above but for 2 decimal places
+func fn2(a float64) (s string) {
+	s = fmt.Sprintf("%.2f", a)
 	return
 }
 

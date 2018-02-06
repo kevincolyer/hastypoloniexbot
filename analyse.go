@@ -2,6 +2,7 @@ package main
 
 import (
 	"sort"
+	//         "time"
 	//         "fmt"
 
 	"gitlab.com/wmlph/poloniex-api"
@@ -58,15 +59,15 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 	ema := CalcEMA(c, emaperiods)
 	diff := ema - sma
 	balance := state[coin].Balance
-	last := state["LAST"].Coin
+	last := state[LAST].Coin
 	advice = NOACTION
 	anal := "ANAL "
 	Info.Printf(anal+"Currently holding %v %v\n", fc(balance), coin)
 	direction := coin
 	if diff >= 0 {
-		direction += " rising"
+		direction += " ema/sma +ve"
 	} else {
-		direction += " falling"
+		direction += " ema/sma -ve"
 	}
 	Info.Printf(anal+"%v: sma(%v): %v ema(%v): %v diff: %v\n", direction, smaperiods, fc(sma), emaperiods, fc(ema), fc(diff))
 
@@ -88,8 +89,8 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 			return
 
 		}
-		advice = BUY // only recommended as  balance ==0 
-		Info.Printf(anal+"Recommend BUY %v ranking %v above triggerbuy %v\n", coin, fp2(ranking),fp2(triggerbuy))
+		advice = BUY // only recommended as  balance ==0
+		Info.Printf(anal+"Recommend BUY %v ranking %v above triggerbuy %v\n", coin, fp2(ranking), fp2(triggerbuy))
 		return
 	}
 
@@ -102,6 +103,11 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 		percentloss = 0
 	}
 	// possible sell if trending down
+	if balance > 0 && purchaseprice < currentprice {
+		advice = SELL
+		Info.Printf(anal+"Recommend SELL as currentprice %v is less than purchased price %v\n", fc(currentprice), fc(purchaseprice))
+		return
+	}
 	if balance > 0 && ema < sma {
 		// curent price < purchase price-allowable loss the advice = sell
 		if percentloss < 0 && -percentloss > maxlosstorisk {
@@ -128,7 +134,11 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 		advice = SELL
 		return
 	}
-	// TODO held coin for too long (max time) e.g. 24hours
+	// 	if balance>0 && state[coin].Date <time.Now().Sub(time.Hour*24) {
+	//                 Info.Printf(anal+"SELL: Coin is was purchased more than 24 hours ago %v\n", state[coin].Date)
+	// 		advice = SELL
+	// 		return
+	//         }
 	Info.Print(anal + "Nothing to do. No concerns")
 	return
 }

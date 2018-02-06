@@ -1,43 +1,38 @@
 # chartdata is api call - gives 24 hour data for a pair
 # https://github.com/toml-lang/toml
 
-
-
 [BotControl]
-active=false        # default do nothing - change this!
+active=true        # default do nothing - change this!
 simulate=true       # default do nothing - change this! Can use a -simulate=true  as overide
 sellsellsell=false  # crash sell command. Otherwise will look to trade. Can use a -sellsellsell=true  as overide
 botname="HastyPoloniexBot"
 
 [Credentials]
-apikey=
-secret=
+apikey="blah"
+secret="blah"
 
 
 [Currency]
-fiat="USD"            # fiat currency to compare to for reports
+fiat="USDT"            # fiat currency to compare to for reports
 base="BTC"            # BTC is good for base
 target="STR"          # chose something volotile! 
+targets="STR,XVC,XRP,ETH,LTC,NXT,XMR"
 
 [TradingRules]
 minbasetotrade=0.02 # will trade in blocks of this size
-maxgrowth=3         # how many times greater than purchase price before a forced sale
-maxlosstorisk=0.03  # how much loss lower than purchase price to risk before forcing a sell # TODO actual price or ema or sma????
+fragments=3
+maxgrowth=2         # how many times greater than purchase price before a forced sale
+maxlosstorisk=0.01  # how much loss lower than purchase price to risk before forcing a sell # TODO actual price or ema or sma????
+triggerbuy=0.0075     # % of sma that diff between ema and sma must show to trigger a buy
+buyfee=0.0025       # %
+sellfee=0.0025      # % 0.0015=0.15%
 
 
-[Analysys]
+[Analysis]
 ema=30              # exponential moving average (takes recent sales more into account) orange line
 sma=50              # Simple moving average (average over a period)- blue line - if ema is higher then buy
-period=300          # period between chart data points (lowest poloniex offers)
+period=300          # period between chart data points (300 lowest poloniex offers, normal view is 30mins=1800)
 
 [DataStore]
-#type="csv"
-#filename="data"
 
-type="toml"
-filename="data"
-
-[logging]
-filename="tradingbot"
-path="."
-configname="config.toml"
+filename="state.json"

@@ -2,7 +2,7 @@ package main
 
 import (
 	"sort"
-	//         "time"
+	"time"
 	//         "fmt"
 
 	"gitlab.com/wmlph/poloniex-api"
@@ -134,11 +134,11 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 		advice = SELL
 		return
 	}
-	// 	if balance>0 && state[coin].Date <time.Now().Sub(time.Hour*24) {
-	//                 Info.Printf(anal+"SELL: Coin is was purchased more than 24 hours ago %v\n", state[coin].Date)
-	// 		advice = SELL
-	// 		return
-	//         }
+		if balance>0 && state[coin].Date.Before(time.Now().Add(-time.Hour*24)) {
+	                Info.Printf(anal+"SELL: Coin is was purchased more than 24 hours ago %v\n", state[coin].Date)
+			advice = SELL
+			return
+	        }
 	Info.Print(anal + "Nothing to do. No concerns")
 	return
 }

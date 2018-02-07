@@ -108,6 +108,12 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 		Info.Printf(anal+"Recommend SELL as currentprice %v is less than purchased price %v\n", fc(currentprice), fc(purchaseprice))
 		return
 	}
+	triggersell := conf.GetFloat64("TradingRules.triggersell")
+	if balance > 0 && diff/sma < triggersell {
+		advice = SELL
+		Info.Printf(anal+"Recommend SELL as ema-sma/sma %v is less than triggersell %v\n", fc(diff/sma), fc(triggersell))
+		return
+	}
 	if balance > 0 && ema < sma {
 		// curent price < purchase price-allowable loss the advice = sell
 		if percentloss < 0 && -percentloss > maxlosstorisk {
@@ -134,11 +140,11 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 		advice = SELL
 		return
 	}
-		if balance>0 && state[coin].Date.Before(time.Now().Add(-time.Hour*24)) {
-	                Info.Printf(anal+"SELL: Coin is was purchased more than 24 hours ago %v\n", state[coin].Date)
-			advice = SELL
-			return
-	        }
+	if balance > 0 && state[coin].Date.Before(time.Now().Add(-time.Hour*24)) {
+		Info.Printf(anal+"SELL: Coin is was purchased more than 24 hours ago %v\n", state[coin].Date)
+		advice = SELL
+		return
+	}
 	Info.Print(anal + "Nothing to do. No concerns")
 	return
 }

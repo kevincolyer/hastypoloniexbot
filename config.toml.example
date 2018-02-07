@@ -23,7 +23,8 @@ minbasetotrade=0.02 # will trade in blocks of this size
 fragments=3
 maxgrowth=2         # how many times greater than purchase price before a forced sale
 maxlosstorisk=0.01  # how much loss lower than purchase price to risk before forcing a sell # TODO actual price or ema or sma????
-triggerbuy=0.0075     # % of sma that diff between ema and sma must show to trigger a buy
+triggerbuy=0.01     # % of sma that diff between ema and sma must show to trigger a buy
+triggersell=0.005
 buyfee=0.0025       # %
 sellfee=0.0025      # % 0.0015=0.15%
 

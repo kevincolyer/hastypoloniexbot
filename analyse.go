@@ -61,8 +61,8 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 	balance := state[coin].Balance
 	last := state[LAST].Coin
 	advice = NOACTION
-	anal := "ANAL "
-	Info.Printf(anal+"Currently holding %v %v\n", fc(balance), coin)
+	anal := "ANAL "+coin+" "
+	Info.Printf(anal+"Currently holding %v\n", fc(balance))
 	direction := coin
 	if diff >= 0 {
 		direction += " ema/sma +ve"
@@ -90,7 +90,7 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 
 		}
 		advice = BUY // only recommended as  balance ==0
-		Info.Printf(anal+"Recommend BUY %v ranking %v above triggerbuy %v\n", coin, fp2(ranking), fp2(triggerbuy))
+		Info.Printf(anal+"Recommend BUY ranking %v above triggerbuy %v\n",  fp2(ranking), fp2(triggerbuy))
 		return
 	}
 
@@ -103,11 +103,11 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 		percentloss = 0
 	}
 	// possible sell if trending down
-	if balance > 0 && purchaseprice < currentprice {
-		advice = SELL
-		Info.Printf(anal+"Recommend SELL as currentprice %v is less than purchased price %v\n", fc(currentprice), fc(purchaseprice))
-		return
-	}
+// 	if balance > 0 &&  currentprice < purchaseprice {
+// 		advice = SELL
+// 		Info.Printf(anal+"Recommend SELL as currentprice %v is less than purchased price %v\n", fc(currentprice), fc(purchaseprice))
+// 		return
+// 	}
 	triggersell := conf.GetFloat64("TradingRules.triggersell")
 	if balance > 0 && diff/sma < triggersell {
 		advice = SELL
@@ -136,12 +136,12 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 	maxgrowth := conf.GetFloat64("TradingRules.maxgrowth")
 	growth := currentprice - purchaseprice/purchaseprice
 	if balance > 0 && growth > maxgrowth {
-		Info.Printf(anal+"SELL: Coin is %v times greater than purchase price - triggered maxgrowth %v\n", fn(growth), fn(maxgrowth))
+		Info.Printf(anal+"SELL:  %v times greater than purchase price - triggered maxgrowth %v\n", fn(growth), fn(maxgrowth))
 		advice = SELL
 		return
 	}
 	if balance > 0 && state[coin].Date.Before(time.Now().Add(-time.Hour*24)) {
-		Info.Printf(anal+"SELL: Coin is was purchased more than 24 hours ago %v\n", state[coin].Date)
+		Info.Printf(anal+"SELL: Purchased more than 24 hours ago %v\n", state[coin].Date)
 		advice = SELL
 		return
 	}

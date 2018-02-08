@@ -127,6 +127,9 @@ func store(s map[string]*coinstate) {
 
 func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
+        // set up throttler so we don't make more than 6 api calls per sec.
+        throttlerchan = make(chan tick)
+	go throttler(throttlerchan)
 }
 
 type coinaction struct {
@@ -232,6 +235,7 @@ func main() {
 	///////////////////////////////////////////
 	Info.Println("Cancelling all Open Orders")
 	// TODO
+        // throttle()
 
 	///////////////////////////////////////////
 	// buying and selling for each coin
@@ -246,14 +250,15 @@ func main() {
 		coinbalance := state[coin].Balance
 		action := todo[i].action
 		basebalance := state[base].Balance
-		if action == BUY && coinbalance > 0 {
-			Info.Printf(coin+" BUY cannot proceed as already hold %v\n", fc(coinbalance))
-		}
+// 		if action == BUY && coinbalance > 0 {
+// 			Info.Printf(coin+" BUY cannot proceed as already hold %v\n", fc(coinbalance))
+// 		}
 		if action == BUY && coinbalance == 0 {
 			// check enough balance to make an order (minorder)
 			// get current asking price
 
 			if basebalance > minbasetotrade {
+                                throttle()
 				Info.Println(coin + " Placing BUY  order")
 				if fragmenttotal < maxfragments && basebalance > minbasetotrade*2 {
 					fragmenttotal++
@@ -269,6 +274,7 @@ func main() {
 		if action == SELL {
 			// get current bidding price
 			// get balance and sell all
+                        throttle()
 			Info.Println(coin + " Placing SELL order")
 			Sell(base, coin, ticker[base+"_"+coin].Bid, coinbalance)
 

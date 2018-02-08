@@ -10,13 +10,14 @@ func SellSellSell() {
 		Info.Println("Simulating SellSellSell order")
 		return
 	}
+	throttle()
 }
 
 func Buy(base, coin string, price, basebalance float64) {
 	if conf.GetBool("BotControl.Simulate") {
-		Info.Println("Simulating buy order")
+// 		Info.Println("Simulating buy order")
 		if rand.Intn(20) == 0 {
-			Warning.Print("Simulated Buy failed (random chance in 20)")
+			Warning.Print(coin+" Simulated Buy failed (random chance in 20)")
 			return
 		}
 		// assume a buy completes (to make simulation work!)
@@ -37,17 +38,17 @@ func Buy(base, coin string, price, basebalance float64) {
 		if state[base].Balance < 0 {
 			state[base].Balance = 0
 		}
-		Info.Printf("Order placed for %v of %v at %v (paid %v %v)\n", fc(coinbalance), coin, fc(price), fc(basebalance), base)
+		Info.Printf(coin+ " Buy  order placed for %v of %v at %v (paid %v %v)\n", fc(coinbalance), coin, fc(price), fc(basebalance), base)
 		return
 	}
 }
 
 func Sell(base, coin string, price, coinbalance float64) {
 	if conf.GetBool("BotControl.Simulate") {
-		Info.Println("Simulating Sell order")
+		//Info.Println("Simulating Sell order")
 
 		if rand.Intn(20) == 0 {
-			Warning.Print("Simulated Sell failed (random chance in 20)")
+			Warning.Print(coin+" Simulated Sell failed (random chance in 20)")
 			return
 		}
 		// assume a sale completes (to make simulation work!)
@@ -64,7 +65,7 @@ func Sell(base, coin string, price, coinbalance float64) {
 			state[coin].Balance = 0
 		}
 
-		Info.Printf("Sell Order placed for %v of %v at %v (received %v %v)\n", fc(coinbalance), coin, fc(price), fc(valueafterfees), base)
+		Info.Printf(coin+" Sell order placed for %v of %v at %v (received %v %v)\n", fc(coinbalance), coin, fc(price), fc(valueafterfees), base)
 		return
 	}
 }

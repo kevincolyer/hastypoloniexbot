@@ -38,7 +38,7 @@ func Analyse(coin string) (advice int, ranking float64) {
 	advice = NOACTION
 	pair := conf.GetString("Currency.Base") + "_" + coin
 	period := conf.GetInt("Analysis.period")
-	Info.Printf(coin+ " Analysis using ema and sma for period of %v\n", period)
+	Info.Printf(coin+" Analysis using ema and sma for period of %v\n", period)
 	// get chartdata from polo for coin
 	data, err := exchange.ChartDataPeriod(pair, period)
 	if err != nil {

@@ -50,19 +50,20 @@ func Buy(base, coin string, price, basebalance float64) {
 	//Buy(pair string, rate, amount float64) (buy Buy, err error) {
 	Info.Printf(coin+" Buy  order placed for %v of %v at %v (paid %v %v probably)\n", fc(coinbalance), coin, fc(price), fc(basebalance), base)
 	throttle()
-	buyorder, err := exchange.BuyPostOnly(base+"_"+coin, price, basebalance/price)
+	buyorder, err := exchange.Buy(base+"_"+coin, price, basebalance/price)
+	// placing this below so coins that follow don't use all the balance...
+	state[base].Balance -= basebalance
 	if err != nil {
 		Warning.Printf(coin+" BUY  order failed for %v with error: %v\n", coin, err)
 		return
 	}
-	if buyorder.OrderNumber==0 {
-		Warning.Printf(coin+ " BUY  order was not placed at exchange\n")
+	if buyorder.OrderNumber == 0 {
+		Warning.Printf(coin + " BUY  order was not placed at exchange\n")
 		return
-        }
+	}
 	state[coin].Date = time.Now()
 	state[coin].PurchasePrice = price
 	state[coin].OrderNumber = strconv.FormatInt(buyorder.OrderNumber, 10)
-	state[base].Balance -= basebalance
 
 	return
 }
@@ -103,11 +104,11 @@ func Sell(base, coin string, price, coinbalance float64) {
 		Warning.Printf(coin+" SELL order failed for %v with error: %v\n", coin, err)
 		return
 	}
-	
-	if sellorder.OrderNumber==0 {
-		Warning.Printf(coin+ " SELL order was not placed at exchange\n")
+
+	if sellorder.OrderNumber == 0 {
+		Warning.Printf(coin + " SELL order was not placed at exchange\n")
 		return
-        }
+	}
 	// provisional values - sale might not go ahead!
 	state[coin].Balance = 0
 	state[base].Balance += valueafterfees

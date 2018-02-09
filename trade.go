@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-        "time"
+	"time"
 
 	"gitlab.com/wmlph/poloniex-api"
 )
@@ -42,12 +42,12 @@ func trade() {
 	// get current values and prices
 
 	if simulate == false {
-// 		balances, err = exchange.BalancesAll()
+		// 		balances, err = exchange.BalancesAll()
 		balances, err = exchange.AvailableAccountBalances()
 		if err != nil {
 			Error.Printf("Failed to get coin AccountBalances from poloniex: %v\n", err)
 		}
-		state[base].Balance = balances.Exchange[base]// + balances[base].OnOrders // include open buy orders - they will get cancelled below. Posssible race condition here!
+		state[base].Balance = balances.Exchange[base] // + balances[base].OnOrders // include open buy orders - they will get cancelled below. Posssible race condition here!
 	}
 
 	basebalance := state[base].Balance // SIMULATION
@@ -67,7 +67,7 @@ func trade() {
 		if simulate {
 			coinbalance = state[coin].Balance // SIMULATION!
 		} else {
-// 			coinbalance = balances[coin].Available + balances[coin].OnOrders // REAL THING!
+			// 			coinbalance = balances[coin].Available + balances[coin].OnOrders // REAL THING!
 			coinbalance = balances.Exchange[coin] // REAL THING!
 		}
 
@@ -84,28 +84,27 @@ func trade() {
 			}
 		}
 		todo = append(todo, coinaction{coin: coin, action: action}) // used to prepare todo slice for use in sellsellsell
-                state[coin].Balance=coinbalance
+		state[coin].Balance = coinbalance
 		state[coin].FiatValue = infiat
 		state[coin].BaseValue = inbase
 	}
 	state[TOTAL].Balance = basetotal
 	state[TOTAL].FiatValue = basetotal * FIATBTC
-	
+
 	// if first run and state not prev saved then mark our start position for statistical evaluation
-        if _, ok := state[START]; !ok {
-                state[START] = &coinstate{Coin: base, Balance: basebalance, Date: time.Now(),FiatValue:state[base].FiatValue}
+	if _, ok := state[START]; !ok {
+		state[START] = &coinstate{Coin: base, Balance: basebalance, Date: time.Now(), FiatValue: state[base].FiatValue}
 	}
-	
-	
+
 	///////////////////////////////////////////
 	// print current balances
 
 	Info.Print("BALANCES")
 	Info.Printf("%v %v (%v %v) \n", base, fc(basebalance), fc(basebalance*FIATBTC), fiat)
 	for _, coin = range targets {
-                if state[coin].Balance>0 {
-		Info.Printf("%v %v (%v %v) \n", coin, fc(state[coin].Balance), fc(state[coin].FiatValue), fiat)
-                }
+		if state[coin].Balance > 0 {
+			Info.Printf("%v %v (%v %v) \n", coin, fc(state[coin].Balance), fc(state[coin].FiatValue), fiat)
+		}
 	}
 	Info.Printf("BALANCE Total %v %v over %v coins", fc(basetotal), base, fragmenttotal)
 
@@ -184,14 +183,13 @@ func trade() {
 		}
 	}
 
-	
 	////////////////////////////////////
 	//update state before saving
 	Info.Print("UPDATING STATS")
 	basetotal = state[base].Balance
 	state[base].FiatValue = basetotal * FIATBTC
 	state[base].BaseValue = basetotal
-	s := fmt.Sprintf("coin|balance|BTC|%v\n",fiat)
+	s := fmt.Sprintf("coin|balance|BTC|%v\n", fiat)
 	s += fmt.Sprintf("%v|%v|%v|%v\n", base, fc(basetotal), fc(basetotal), fn2(basetotal*FIATBTC))
 	for _, coin = range targets {
 		coinbalance = state[coin].Balance
@@ -206,7 +204,7 @@ func trade() {
 	s += fmt.Sprintf("%v|%v|%v|%v\n", "TOTAL", fc(0), fc(basetotal), fn2(basetotal*FIATBTC))
 	// what a hack!
 	state[TOTAL].OrderNumber = s
-	state[TOTAL].Misc=fmt.Sprintf("%v",time.Now().Sub(state[START].Date))
+	state[TOTAL].Misc = fmt.Sprintf("%v", time.Now().Sub(state[START].Date))
 	////////////////////////////////////
 
 	if sss {

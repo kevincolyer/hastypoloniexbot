@@ -26,7 +26,7 @@ type coinstate struct {
 	OrderNumber    string
 	FiatValue      float64
 	BaseValue      float64
-	Misc          string
+	Misc           string
 }
 
 var (
@@ -51,7 +51,7 @@ const (
 const (
 	LAST  = "_LAST_"
 	TOTAL = "_TOTAL_"
-        START = "_START_"
+	START = "_START_"
 )
 
 func LogInit(output string) {
@@ -149,7 +149,7 @@ func main() {
 	ConfInit(config)
 	BotName = conf.GetString("BotControl.botname")
 	LogInit(BotName + ".log")
-	Info.Println("STARTING " + BotName+ " VERSION "+VERSION)
+	Info.Println("STARTING " + BotName + " VERSION " + VERSION)
 	//       	Info.Println("Loaded config file")
 	//	Info.Println("Loaded state information")
 

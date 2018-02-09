@@ -38,7 +38,7 @@ func Analyse(coin string) (advice int, ranking float64) {
 	advice = NOACTION
 	pair := conf.GetString("Currency.Base") + "_" + coin
 	period := conf.GetInt("Analysis.period")
-	Info.Printf("Analysis of %v using ema and sma for period of %v\n", pair, period)
+	Info.Printf(coin+ " Analysis using ema and sma for period of %v\n", period)
 	// get chartdata from polo for coin
 	data, err := exchange.ChartDataPeriod(pair, period)
 	if err != nil {
@@ -61,7 +61,7 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 	balance := state[coin].Balance
 	last := state[LAST].Coin
 	advice = NOACTION
-	anal := "ANAL "+coin+" "
+	anal := coin + " "
 	Info.Printf(anal+"Currently holding %v\n", fc(balance))
 	direction := coin
 	if diff >= 0 {
@@ -90,7 +90,7 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 
 		}
 		advice = BUY // only recommended as  balance ==0
-		Info.Printf(anal+"Recommend BUY ranking %v above triggerbuy %v\n",  fp2(ranking), fp2(triggerbuy))
+		Info.Printf(anal+"Recommend BUY ranking %v above triggerbuy %v\n", fp2(ranking), fp2(triggerbuy))
 		return
 	}
 
@@ -103,11 +103,11 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 		percentloss = 0
 	}
 	// possible sell if trending down
-// 	if balance > 0 &&  currentprice < purchaseprice {
-// 		advice = SELL
-// 		Info.Printf(anal+"Recommend SELL as currentprice %v is less than purchased price %v\n", fc(currentprice), fc(purchaseprice))
-// 		return
-// 	}
+	// 	if balance > 0 &&  currentprice < purchaseprice {
+	// 		advice = SELL
+	// 		Info.Printf(anal+"Recommend SELL as currentprice %v is less than purchased price %v\n", fc(currentprice), fc(purchaseprice))
+	// 		return
+	// 	}
 	triggersell := conf.GetFloat64("TradingRules.triggersell")
 	if balance > 0 && diff/sma < triggersell {
 		advice = SELL

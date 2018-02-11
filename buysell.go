@@ -64,7 +64,7 @@ func Buy(base, coin string, price, basebalance float64) {
 	state[coin].Date = time.Now()
 	state[coin].PurchasePrice = price
 	state[coin].OrderNumber = strconv.FormatInt(buyorder.OrderNumber, 10)
-
+	state[coin].Balance += basebalance / price
 	return
 }
 
@@ -80,6 +80,7 @@ func Sell(base, coin string, price, coinbalance float64) {
 		// assume a sale completes (to make simulation work!)
 		state[LAST].Coin = base
 		state[coin].PurchasePrice = price
+		state[coin].SaleDate = time.Now()
 		//value:=price*coinbalance
 
 		state[coin].Balance -= coinbalance
@@ -112,6 +113,7 @@ func Sell(base, coin string, price, coinbalance float64) {
 	// provisional values - sale might not go ahead!
 	state[coin].Balance = 0
 	state[base].Balance += valueafterfees
+	state[coin].SaleDate = time.Now()
 
 }
 

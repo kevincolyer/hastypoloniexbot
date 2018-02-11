@@ -15,12 +15,13 @@ import (
 	"gitlab.com/wmlph/poloniex-api"
 )
 
-const VERSION = "0.1.0"
+const VERSION = "0.1.2"
 
 type coinstate struct {
 	Coin           string
 	Balance        float64
 	Date           time.Time
+	SaleDate       time.Time
 	PurchasePrice  float64
 	PurchaseAmount float64
 	OrderNumber    string

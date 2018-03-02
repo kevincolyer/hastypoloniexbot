@@ -27,6 +27,8 @@ type coinstate struct {
 	OrderNumber    string
 	FiatValue      float64
 	BaseValue      float64
+	LastEma        float64
+	LastSma        float64
 	Misc           string
 }
 
@@ -42,6 +44,12 @@ var (
 //         state *viper.Viper
 
 )
+
+type coinaction struct {
+	coin    string
+	action  int
+	ranking float64
+}
 
 const (
 	NOACTION = iota
@@ -136,15 +144,14 @@ func init() {
 	go throttler(throttlerchan)
 }
 
-type coinaction struct {
-	coin    string
-	action  int
-	ranking float64
-}
 
 func main() {
 	var config string
+	var collectdata bool
+	var mergedata bool
 	flag.StringVar(&config, "config", "config", "config file to use")
+	flag.BoolVar(&collectdata, "collectdata", false, "collect ticker data and save to data folder as unixtime.json")
+	flag.BoolVar(&mergedata, "mergedata", false, "Merge all collected ticker data and save to data folder")
 	flag.Parse()
 
 	ConfInit(config)
@@ -157,6 +164,16 @@ func main() {
 	// load config file
 	defer store(state) // make sure state info is saved when program terminates
 
+        if collectdata {
+            Info.Println("Collecting ticker data")
+            collectTickerData()
+            return
+        }
+        if mergedata {
+            Info.Println("Merging ticker data")
+            mergeData()
+            return
+        }
 	if conf.GetBool("BotControl.Active") == false {
 		Info.Println("Active is FALSE - Quiting")
 		return

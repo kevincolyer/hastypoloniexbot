@@ -10,7 +10,7 @@ for my $i  (0..$#ARGV) {
     my $file=$ARGV[$i];
     say $file."\n";
     my $sum= `./statesummary $file\n`;
-    $sum =~ s/ (\d+ h \d+ m \d+ \. \d* s) $/betterdur($1) if $1 ne ""/egmx;
+    $sum =~ s/ (\d+ h? \d+ m \d+ \. \d* s) $/betterdur($1) if $1 ne ""/egmx;
     say $sum;
     
     my $dur= `jq ._TOTAL_.Misc $file`;
@@ -24,14 +24,14 @@ for my $i  (0..$#ARGV) {
 
     my $betterdur=betterdur($dur);
     $startcoin =~ s/"(\w+)"/$1/;
-    say "\nGrowth: $growth%  Duration: $betterdur  Start balance: $startbalance $startcoin \n";
+    say "\nGrowth: $growth%  Duration: $betterdur  \nStart balance: $startbalance $startcoin \n";
 }
 
 say '</pre></body></html>';
 
 sub betterdur {
     my $dur=shift ;
-    my ($hours,$rest,$trim) = $dur =~  m/ "? (\d+)? h ([\w \d]+) (\. \d+ s ) "?$ /x;
+    my ($hours,$rest,$trim) = $dur =~  m/ "? (\d+ h)?  ([\w \d]+) (\. \d+ s ) "?$ /x;
     #say "dur $dur hours $hours rest $rest trim $trim";
     my $days=int($hours/24);
     $hours=$hours % 24;

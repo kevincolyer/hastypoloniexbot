@@ -49,31 +49,32 @@ func Analyse(coin string) (advice int, ranking float64) {
 	return analyseChartData(closings, coin)
 }
 
-
 type analysisdata struct {
-        advice  int
-        ranking float64
-        ema float64
-        sma float64
-        coin string
-        coinbalance float64
-        purchaseprice float64
-        purchasedate time.Time
-        lastsold time.Time
-        coofoffperiod bool
-        maxholdduration bool
-        lastema float64
-        lastsma float64
-        triggerbuy float64
-        triggersell float64
-        maxlosstorisk float64
-        percentloss float64
-        maxgrowth float64
+	advice          int
+	ranking         float64
+	ema             float64
+	sma             float64
+	coin            string
+	coinbalance     float64
+	purchaseprice   float64
+	purchasedate    time.Time
+	lastsold        time.Time
+	coofoffperiod   bool
+	maxholdduration bool
+	lastema         float64
+	lastsma         float64
+	triggerbuy      float64
+	triggersell     float64
+	maxlosstorisk   float64
+	percentloss     float64
+	maxgrowth       float64
 }
 
-func pdiff(e,s float64) float64 {
-    if s==0  { return 0 }
-    return (e-s)/s
+func pdiff(e, s float64) float64 {
+	if s == 0 {
+		return 0
+	}
+	return (e - s) / s
 }
 
 func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
@@ -90,18 +91,18 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 	last := state[LAST].Coin
 	cooloffperiod := false
 	lastsold := state[coin].SaleDate
-	lastema:=state[coin].LastEma
-	lastsma:=state[coin].LastSma
-	state[coin].LastEma=ema 
-	state[coin].LastSma=sma
-	trendingdown:=pdiff(ema,sma) < pdiff(lastema,lastsma)
+	lastema := state[coin].LastEma
+	lastsma := state[coin].LastSma
+	state[coin].LastEma = ema
+	state[coin].LastSma = sma
+	trendingdown := pdiff(ema, sma) < pdiff(lastema, lastsma)
 
-        if trendingdown { 
-            Info.Printf("ma diff %v is trending down from last diff %v\n",fc(pdiff(ema,sma)),fc(pdiff(lastema,lastsma)) ) 
-        } else {
-            Info.Printf("ma diff %v is trending up from last diff %v\n",fc(pdiff(ema,sma)),fc(pdiff(lastema,lastsma)) ) 
-        }
-	
+	if trendingdown {
+		Info.Printf("ma diff %v is trending down from last diff %v\n", fc(pdiff(ema, sma)), fc(pdiff(lastema, lastsma)))
+	} else {
+		Info.Printf("ma diff %v is trending up from last diff %v\n", fc(pdiff(ema, sma)), fc(pdiff(lastema, lastsma)))
+	}
+
 	dur, err := time.ParseDuration(conf.GetString("TradingRules.CoolOffDuration"))
 	if err != nil {
 		dur, _ = time.ParseDuration("2h")
@@ -158,23 +159,23 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 	maxlosstorisk := conf.GetFloat64("TradingRules.maxlosstorisk")
 	triggersell := conf.GetFloat64("TradingRules.triggersell")
 	percentloss := (currentprice - purchaseprice) / purchaseprice
-	pl:=percentloss
+	pl := percentloss
 	if percentloss > 0 {
 		percentloss = 0
 	}
 	// sell if trending down (buy back should be delayed a few hours)
-	Info.Printf(anal+"PurchasePrice %v currentprice %v percentloss %v %v purchasedate %v lastsale %v \n", fc(purchaseprice), fc(currentprice), fn(percentloss), fn(pl),state[coin].Date, state[coin].SaleDate)
+	Info.Printf(anal+"PurchasePrice %v currentprice %v percentloss %v %v purchasedate %v lastsale %v \n", fc(purchaseprice), fc(currentprice), fn(percentloss), fn(pl), state[coin].Date, state[coin].SaleDate)
 
-// 	if balance > 0 && percentloss < 0 {
-// 
-// 		if -percentloss < maxlosstorisk {
-// 			Warning.Printf(anal+"Price is %v %% below purchase price but not at maxlosstorisk %v %%\n", fp2(percentloss), fp2(maxlosstorisk))
-// 			return
-// 		}
-// 		advice = SELL
-// 		Info.Printf(anal+"Price is %v %% below purchase price and greater than maxlosstorisk %v %%. Advice SELL\n", fp2(percentloss), fp2(maxlosstorisk))
-// 		return
-// 	}
+	// 	if balance > 0 && percentloss < 0 {
+	//
+	// 		if -percentloss < maxlosstorisk {
+	// 			Warning.Printf(anal+"Price is %v %% below purchase price but not at maxlosstorisk %v %%\n", fp2(percentloss), fp2(maxlosstorisk))
+	// 			return
+	// 		}
+	// 		advice = SELL
+	// 		Info.Printf(anal+"Price is %v %% below purchase price and greater than maxlosstorisk %v %%. Advice SELL\n", fp2(percentloss), fp2(maxlosstorisk))
+	// 		return
+	// 	}
 	// 		if balance > 0 &&  currentprice < purchaseprice {
 	// 			advice = SELL
 	// 			Info.Printf(anal+"Recommend SELL as currentprice %v is less than purchased price %v\n", fc(currentprice), fc(purchaseprice))

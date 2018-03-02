@@ -15,7 +15,7 @@ import (
 	"gitlab.com/wmlph/poloniex-api"
 )
 
-const VERSION = "0.1.2"
+const VERSION = "0.1.3"
 
 type coinstate struct {
 	Coin           string
@@ -144,7 +144,6 @@ func init() {
 	go throttler(throttlerchan)
 }
 
-
 func main() {
 	var config string
 	var collectdata bool
@@ -157,23 +156,23 @@ func main() {
 	ConfInit(config)
 	BotName = conf.GetString("BotControl.botname")
 	LogInit(BotName + ".log")
-	Info.Println("STARTING " + BotName + " VERSION " + VERSION)
+	Info.Println("STARTING HastyPoloniexBot VERSION " + VERSION + " Bot name:" + BotName)
 	//       	Info.Println("Loaded config file")
 	//	Info.Println("Loaded state information")
 
 	// load config file
 	defer store(state) // make sure state info is saved when program terminates
 
-        if collectdata {
-            Info.Println("Collecting ticker data")
-            collectTickerData()
-            return
-        }
-        if mergedata {
-            Info.Println("Merging ticker data")
-            mergeData()
-            return
-        }
+	if collectdata {
+		Info.Println("Collecting ticker data")
+		collectTickerData()
+		return
+	}
+	if mergedata {
+		Info.Println("Merging ticker data")
+		mergeData()
+		return
+	}
 	if conf.GetBool("BotControl.Active") == false {
 		Info.Println("Active is FALSE - Quiting")
 		return

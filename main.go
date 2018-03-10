@@ -134,7 +134,6 @@ func store(s map[string]*coinstate) {
 	if err != nil {
 		panic(fmt.Errorf("Fatal error writing state file: %s \n", err))
 	}
-	// 	Info.Println("Stored state information")
 }
 
 func init() {
@@ -153,14 +152,12 @@ func main() {
 	flag.BoolVar(&mergedata, "mergedata", false, "Merge all collected ticker data and save to data folder")
 	flag.Parse()
 
+	// load config file
 	ConfInit(config)
 	BotName = conf.GetString("BotControl.botname")
 	LogInit(BotName + ".log")
 	Info.Println("STARTING HastyPoloniexBot VERSION " + VERSION + " Bot name:" + BotName)
-	//       	Info.Println("Loaded config file")
-	//	Info.Println("Loaded state information")
 
-	// load config file
 	defer store(state) // make sure state info is saved when program terminates
 
 	if collectdata {

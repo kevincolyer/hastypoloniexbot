@@ -14,7 +14,7 @@ func collectTickerData() {
 	/////////////////////////////////////
 	// get poloniex data and set up variables from config file
 
-	//Info.Printf("%v\n%v\n", conf.GetString("Credentials.apikey"),conf.GetString("Credentials.secret"))
+	//if Logging { Info.Printf("%v%v", conf.GetString("Credentials.apikey"),conf.GetString("Credentials.secret")) }
 	exchange = poloniex.NewKS(
 		conf.GetString("Credentials.apikey"),
 		conf.GetString("Credentials.secret")) // check for failure needed here?
@@ -23,7 +23,9 @@ func collectTickerData() {
 	// {Last, Ask, Bid,Change,BaseVolume,QuoteVolume,IsFrozen}
 	ticker, err := exchange.Ticker()
 	if err != nil {
-		Error.Printf("Fatal error getting ticker data from poloniex: %v\n", err)
+		if Logging {
+			Error.Printf("Fatal error getting ticker data from poloniex: %v", err)
+		}
 		return
 	}
 
@@ -37,13 +39,17 @@ func collectTickerData() {
 	if err != nil {
 		panic(fmt.Errorf("Fatal error writing data file: %s \n", err))
 	}
-	Info.Println(file + " written ok.")
+	if Logging {
+		Info.Println(file + " written ok.")
+	}
 }
 
 func mergeData() {
 	files, err := ioutil.ReadDir("data")
 	if err != nil {
-		Error.Printf("Fatal error reading data directory: %v (is it created?)\n", err)
+		if Logging {
+			Error.Printf("Fatal error reading data directory: %v (is it created?)", err)
+		}
 		return
 	}
 
@@ -51,24 +57,28 @@ func mergeData() {
 	for _, file := range files {
 		fname := strings.Split(file.Name(), ".")
 		filename := "data/" + file.Name()
-                
-                // filter the directory listing...
+
+		// filter the directory listing...
 		if len(fname) != 2 || fname[1] != "json" || fname[0] == "data" {
-			Info.Print("skipping " + filename)
+			if Logging {
+				Info.Print("skipping " + filename)
+			}
 			continue
 		}
 
 		// read the file data...
 		data, err := ioutil.ReadFile(filename)
 		if err != nil {
-			Info.Print(fmt.Errorf("Fatal error reading file: (%s) %s \n", filename, err))
+			if Logging {
+				Info.Print(fmt.Errorf("Fatal error reading file: (%s) %s ", filename, err))
+			}
 			continue
 		}
 
-		// filter data to remove 
+		// filter data to remove
 		// ...
-		
-		// Info.Print("merging "+filename)
+
+		// if Logging { Info.Print("merging "+filename) }
 		if len(merged) > 1 {
 			merged += ",\n"
 		}
@@ -76,13 +86,19 @@ func mergeData() {
 	}
 	merged += "}" // "}\n"
 	if merged == "{}" {
-		Info.Print("No data to merge. Not writing data/data.json")
+		if Logging {
+			Info.Print("No data to merge. Not writing data/data.json")
+		}
 		return
 	}
 
 	err = ioutil.WriteFile("data/data.json", []byte(merged), 0664)
 	if err != nil {
-		Error.Printf("Fatal error writing data file: %s \n", err)
+		if Logging {
+			Error.Printf("Fatal error writing data file: %s ", err)
+		}
 	}
-	Info.Println("data.json written ok.")
+	if Logging {
+		Info.Println("data.json written ok.")
+	}
 }

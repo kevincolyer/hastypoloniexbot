@@ -12,9 +12,11 @@ import (
 func trade() {
 	/////////////////////////////////////
 	// get poloniex data and set up variables from config file
-	Info.Println("GETTING POLONIEX DATA")
+	if Logging {
+		Info.Println("GETTING POLONIEX DATA")
+	}
 
-	//Info.Printf("%v\n%v\n", conf.GetString("Credentials.apikey"),conf.GetString("Credentials.secret"))
+	//if Logging { Info.Printf("%v%v", conf.GetString("Credentials.apikey"),conf.GetString("Credentials.secret")) }
 	exchange = poloniex.NewKS(
 		conf.GetString("Credentials.apikey"),
 		conf.GetString("Credentials.secret")) // check for failure needed here?
@@ -23,10 +25,13 @@ func trade() {
 	// {Last, Ask, Bid,Change,BaseVolume,QuoteVolume,IsFrozen}
 	ticker, err := exchange.Ticker()
 	if err != nil {
-		Error.Printf("Fatal error getting ticker data from poloniex: %v\n", err)
+		if Logging {
+			Error.Printf("Fatal error getting ticker data from poloniex: %v", err)
+		}
 		return
 	}
 
+	// set up some variables from config
 	fiat := conf.GetString("Currency.Fiat")
 	FIATBTC := ticker[fiat+"_BTC"].Last // can be other curency than usdt
 	base := conf.GetString("Currency.Base")
@@ -45,7 +50,9 @@ func trade() {
 		// 		balances, err = exchange.BalancesAll()
 		balances, err = exchange.AvailableAccountBalances()
 		if err != nil {
-			Error.Printf("Failed to get coin AccountBalances from poloniex: %v\n", err)
+			if Logging {
+				Error.Printf("Failed to get coin AccountBalances from poloniex: %v", err)
+			}
 		}
 		state[base].Balance = balances.Exchange[base] // + balances[base].OnOrders // include open buy orders - they will get cancelled below. Posssible race condition here!
 	}
@@ -69,13 +76,13 @@ func trade() {
 		if simulate {
 			coinbalance = state[coin].Balance // SIMULATION!
 		} else {
-			// 			coinbalance = balances[coin].Available + balances[coin].OnOrders // REAL THING!
+			// coinbalance = balances[coin].Available + balances[coin].OnOrders // REAL THING!
 			coinbalance = balances.Exchange[coin] // REAL THING!
 		}
 
 		infiat := ticker[base+"_"+coin].Last * coinbalance * FIATBTC
 		inbase := ticker[base+"_"+coin].Last * coinbalance
-		// 		Info.Printf("BALANCE %v %v (%v %v) \n", fc(coinbalance), coin, fc(infiat), fiat)
+		// 		if Logging { Info.Printf("BALANCE %v %v (%v %v) ", fc(coinbalance), coin, fc(infiat), fiat) }
 
 		action := NOACTION
 		if coinbalance > 0 {
@@ -101,22 +108,34 @@ func trade() {
 	///////////////////////////////////////////
 	// print current balances
 
-	Info.Print("BALANCES (PROVISIONAL - ORDERS PENDING/CANCELLING)")
-	Info.Printf("%v %v (%v %v) \n", base, fc(basebalance), fc(basebalance*FIATBTC), fiat)
+	if Logging {
+		Info.Print("BALANCES (PROVISIONAL - ORDERS PENDING/CANCELLING)")
+	}
+	if Logging {
+		Info.Printf("%v %v (%v %v) ", base, fc(basebalance), fc(basebalance*FIATBTC), fiat)
+	}
 	for _, coin = range targets {
 		if state[coin].Balance > 0 {
-			Info.Printf("%v %v (%v %v) \n", coin, fc(state[coin].Balance), fc(state[coin].FiatValue), fiat)
+			if Logging {
+				Info.Printf("%v %v (%v %v) ", coin, fc(state[coin].Balance), fc(state[coin].FiatValue), fiat)
+			}
 		}
 	}
-	Info.Printf("BALANCE Total %v %v over %v coins", fc(basetotal), base, fragmenttotal)
+	if Logging {
+		Info.Printf("BALANCE Total %v %v over %v coins", fc(basetotal), base, fragmenttotal)
+	}
 
 	///////////////////////////////////////////
 	// start off by getting all our open orders (that have not been fullfilled for whatever reason) and cancel them
-	Info.Println("CANCELLING ALL OPEN ORDERS")
+	if Logging {
+		Info.Println("CANCELLING ALL OPEN ORDERS")
+	}
 	//
 	if simulate == false {
 		if ok := CancelAllOpenOrders(base, targets); !ok {
-			Error.Println("Problem cancelling all open orders: bailing out.")
+			if Logging {
+				Error.Println("Problem cancelling all open orders: bailing out.")
+			}
 			return
 		}
 	}
@@ -127,7 +146,9 @@ func trade() {
 	// Analyse coins
 	// for each coin get Analyse() to evaluate buy/sell and give a ranking of how strongly it is growing so we can prioritise
 	if sss == false {
-		Info.Println("ANALYSING DATA")
+		if Logging {
+			Info.Println("ANALYSING DATA")
+		}
 
 		for i, _ := range todo {
 			action, ranking := Analyse(todo[i].coin)
@@ -137,7 +158,7 @@ func trade() {
 		// sort by ranking descending
 		sort.Slice(todo, func(i, j int) bool { return todo[i].ranking > todo[j].ranking })
 	}
-	//Info.Printf("coin.action.rank %v\n",todo)
+	//if Logging { Info.Printf("coin.action.rank %v",todo) }
 	///////////////////////////////////////////
 	// buying and selling for each coin
 	// taking our analysis place our orders
@@ -160,7 +181,9 @@ func trade() {
 			// get current asking price
 			if basebalance > minbasetotrade {
 				throttle()
-				Info.Println(coin + " Placing BUY  order")
+				if Logging {
+					Info.Println(coin + " Placing BUY  order")
+				}
 				// TODO need to figure out fragments better - especially if an order does not sell or buy!!!
 				if fragmenttotal < maxfragments && basebalance > minbasetotrade*2 {
 					fragmenttotal++
@@ -169,7 +192,9 @@ func trade() {
 				Buy(base, coin, ticker[base+"_"+coin].Ask, basebalance)
 
 			} else {
-				Info.Printf(coin+" buy: balance of %v is lower (%v) than minbasetotrade rule (%v) Can't place buy order\n", base, fc(basebalance), fc(minbasetotrade))
+				if Logging {
+					Info.Printf(coin+" buy: balance of %v is lower (%v) than minbasetotrade rule (%v) Can't place buy order", base, fc(basebalance), fc(minbasetotrade))
+				}
 			}
 		}
 
@@ -177,14 +202,18 @@ func trade() {
 			// get current bidding price
 			// get balance and sell all
 			throttle()
-			Info.Println(coin + " Placing SELL order")
+			if Logging {
+				Info.Println(coin + " Placing SELL order")
+			}
 			Sell(base, coin, ticker[base+"_"+coin].Bid, coinbalance)
 			sales++
 		}
 
 		if action == NOACTION {
 
-			Info.Print(coin + " Nothing to do")
+			if Logging {
+				Info.Print(coin + " Nothing to do")
+			}
 		}
 	}
 
@@ -193,7 +222,9 @@ func trade() {
 
 	// TODO Pause here and perhaps await an update?
 
-	Info.Print("UPDATING STATS")
+	if Logging {
+		Info.Print("UPDATING STATS")
+	}
 	basetotal = state[base].Balance
 	state[base].FiatValue = basetotal * FIATBTC
 	state[base].BaseValue = basetotal
@@ -220,7 +251,9 @@ func trade() {
 	////////////////////////////////////
 
 	if sss {
-		Info.Printf("SellSellSell run completed. %v sale(s) placed\n", sales)
+		if Logging {
+			Info.Printf("SellSellSell run completed. %v sale(s) placed", sales)
+		}
 	}
 }
 

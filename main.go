@@ -5,7 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/spf13/viper"
-//	"io"
+	//	"io"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -39,7 +39,8 @@ var (
 	conf     *viper.Viper
 	exchange *poloniex.Poloniex
 	state    map[string]*coinstate
-	BotName  = "HastyPoloniexBot"
+	BotName       = "HastyPoloniexBot"
+	Logging  bool = false // initial state of logging
 
 //         state *viper.Viper
 
@@ -63,10 +64,8 @@ const (
 	START = "_START_"
 )
 
-
-
+// CONF
 func ConfInit(config string) {
-	// CONF
 	conf = viper.New()
 	conf.SetConfigType("toml")
 	conf.AddConfigPath(".")
@@ -78,36 +77,39 @@ func ConfInit(config string) {
 	if err != nil {            // Handle errors reading the config file
 		panic(fmt.Errorf("Fatal error reading config file: %s \n", err))
 	}
+}
 
-	// STATE
+// STATE
+func StateInit() {
 	state = make(map[string]*coinstate)
 	statefile := conf.GetString("DataStore.filename")
+
 	if _, err := os.Stat(statefile); os.IsNotExist(err) {
 		// defaults
 		state[conf.GetString("Currency.Base")] = &coinstate{Balance: 0.1, Coin: "BTC"}
 		state[conf.GetString("Currency.Target")] = &coinstate{}
 		state[LAST] = &coinstate{Coin: "BTC"}
 		state[TOTAL] = &coinstate{Coin: "BTC"}
-		store(state)
+		storestate()
 	} else {
-
 		// load and unmarshal state file
 		j, err := ioutil.ReadFile(statefile)
 		if err != nil {
 			panic(fmt.Errorf("Fatal error reading state file: %s \n", err))
+		}
+		if len(j) < 6 && string(j) == "null" {
+			panic("Fatal error: state file is null. (Consider removing)")
 		}
 		err = json.Unmarshal(j, &state)
 		if err != nil {
 			panic(fmt.Errorf("Fatal error unmarshalling state file: %s \n", err))
 		}
 	}
-	// all ok
-
 }
 
-func store(s map[string]*coinstate) {
+func storestate() {
 	// load and unmarshal state file
-	j, err := json.Marshal(s)
+	j, err := json.Marshal(state)
 	if err != nil {
 		panic(fmt.Errorf("Fatal error marshalling json for state file: %s \n", err))
 	}
@@ -135,33 +137,48 @@ func main() {
 
 	// load config file
 	ConfInit(config)
+
+	// config state
+	StateInit()
+	defer storestate() // make sure state info is saved when program terminates
+
+	// initialise logging
+	Logging = true
 	BotName = conf.GetString("BotControl.botname")
 	LogInit(BotName + ".log")
-	Info.Println("STARTING HastyPoloniexBot VERSION " + VERSION + " Bot name:" + BotName)
-
-	defer store(state) // make sure state info is saved when program terminates
+	if Logging {
+		Info.Println("STARTING HastyPoloniexBot VERSION " + VERSION + " Bot name:" + BotName)
+	}
 
 	if collectdata {
-		Info.Println("Collecting ticker data")
+		if Logging {
+			Info.Println("Collecting ticker data")
+		}
 		collectTickerData()
 		return
 	}
 	if mergedata {
-		Info.Println("Merging ticker data")
+		if Logging {
+			Info.Println("Merging ticker data")
+		}
 		mergeData()
 		return
 	}
 	if conf.GetBool("BotControl.Active") == false {
-		Info.Println("Active is FALSE - Quiting")
+		if Logging {
+			Info.Println("Active is FALSE - Quiting")
+		}
 		return
 	}
 	if conf.GetBool("BotControl.Simulate") {
-		Info.Println("Simulate Mode is ON")
+		if Logging {
+			Info.Println("Simulate Mode is ON")
+		}
 	}
 	if conf.GetBool("BotControl.SellSellSell") {
-		Info.Println("SellSellSell detected - attemping to sell all held assets")
-		//SellSellSell()
-		// 		return
+		if Logging {
+			Info.Println("SellSellSell detected - attemping to sell all held assets")
+		}
 	}
 
 	// all setup is done

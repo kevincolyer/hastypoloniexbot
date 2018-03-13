@@ -6,8 +6,6 @@ import (
 	"os"
 )
 
-var Logging bool = false // initial state of logging
-
 func LogInit(output string) {
 
 	file, err := os.OpenFile(output, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
@@ -27,19 +25,4 @@ func LogInit(output string) {
 	Error = log.New(multi,
 		"ERROR: ",
 		log.Ldate|log.Ltime|log.Lshortfile)
-}
-
-func LogError (s string, i ...interface{}) {
-    if Logging { Error.Printf(s,i) }
-    return
-}
-
-func LogInfo (s string, i ...interface{}) {
-    if Logging { Info.Printf(s,i) }
-    return
-}
-
-func LogWarning (s string, i ...interface{}) {
-    if Logging { Warning.Printf(s,i) }
-    return
 }

@@ -51,17 +51,23 @@ func mergeData() {
 	for _, file := range files {
 		fname := strings.Split(file.Name(), ".")
 		filename := "data/" + file.Name()
+                
+                // filter the directory listing...
 		if len(fname) != 2 || fname[1] != "json" || fname[0] == "data" {
 			Info.Print("skipping " + filename)
 			continue
 		}
 
+		// read the file data...
 		data, err := ioutil.ReadFile(filename)
 		if err != nil {
 			Info.Print(fmt.Errorf("Fatal error reading file: (%s) %s \n", filename, err))
 			continue
 		}
 
+		// filter data to remove 
+		// ...
+		
 		// Info.Print("merging "+filename)
 		if len(merged) > 1 {
 			merged += ",\n"

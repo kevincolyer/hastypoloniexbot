@@ -37,35 +37,54 @@ func trade() {
 	base := conf.GetString("Currency.Base")
 	sss := conf.GetBool("BotControl.SellSellSell")
 	simulate := conf.GetBool("BotControl.Simulate")
+
+	// get list of coins we are targetting
+	targets := getTargettedCoins()
+	sort.Strings(targets)
+
 	var coinbalance float64
 	var fragmenttotal float64 // how many coins we will split our base coin into
 	var coin string
 	var todo []coinaction
 	var balances poloniex.AvailableAccountBalances
 
+	///////////////////////////////////////////
+	// start off by getting all our open orders (that have not been fullfilled for whatever reason) and cancel them
+	//
+	if simulate == false {
+		if Logging {
+			Info.Println("CANCELLING ALL OPEN ORDERS")
+		}
+		if ok := CancelAllOpenOrders(base, targets); !ok {
+			if Logging {
+				Error.Println("Problem cancelling all open orders: bailing out.")
+			}
+			return
+		}
+	}
+
+	// TODO there may be coins cancelling or not yet canceled that will mess up the balance calcs!
+
 	//////////////////////////////////////
 	// get current values and prices
 
+	// get balance of base currency only if not simulating!
 	if simulate == false {
-		// 		balances, err = exchange.BalancesAll()
-		balances, err = exchange.AvailableAccountBalances()
+		balances, err = exchange.AvailableAccountBalances() // kpc added this function
 		if err != nil {
 			if Logging {
 				Error.Printf("Failed to get coin AccountBalances from poloniex: %v", err)
 			}
 		}
-		state[base].Balance = balances.Exchange[base] // + balances[base].OnOrders // include open buy orders - they will get cancelled below. Posssible race condition here!
+		state[base].Balance = balances.Exchange[base]
+		// + balances[base].OnOrders // include open buy orders - they will get cancelled below. Posssible race condition here!
 	}
 
+	// more variables now we know them
 	basebalance := state[base].Balance // SIMULATION
 	basetotal := basebalance
 	state[base].FiatValue = basebalance * FIATBTC
 	state[base].BaseValue = basebalance // for completeness
-
-	// get list of coins we are targetting
-	targets := getTargettedCoins()
-	// sort targets
-	sort.Strings(targets)
 
 	for _, coin = range targets {
 		// if we have not loaded this coin from json, we need to add it to the map.
@@ -76,13 +95,11 @@ func trade() {
 		if simulate {
 			coinbalance = state[coin].Balance // SIMULATION!
 		} else {
-			// coinbalance = balances[coin].Available + balances[coin].OnOrders // REAL THING!
 			coinbalance = balances.Exchange[coin] // REAL THING!
 		}
 
 		infiat := ticker[base+"_"+coin].Last * coinbalance * FIATBTC
 		inbase := ticker[base+"_"+coin].Last * coinbalance
-		// 		if Logging { Info.Printf("BALANCE %v %v (%v %v) ", fc(coinbalance), coin, fc(infiat), fiat) }
 
 		action := NOACTION
 		if coinbalance > 0 {
@@ -102,45 +119,20 @@ func trade() {
 
 	// if first run and state not prev saved then mark our start position for statistical evaluation
 	if _, ok := state[START]; !ok {
-		state[START] = &coinstate{Coin: base, Balance: basebalance, Date: time.Now(), FiatValue: state[base].FiatValue}
+		state[START] = &coinstate{Coin: base, Balance: basebalance, Date: getTimeNow(), FiatValue: state[base].FiatValue}
 	}
 
-	///////////////////////////////////////////
-	// print current balances
-
 	if Logging {
+		// print current balances to log
 		Info.Print("BALANCES (PROVISIONAL - ORDERS PENDING/CANCELLING)")
-	}
-	if Logging {
 		Info.Printf("%v %v (%v %v) ", base, fc(basebalance), fc(basebalance*FIATBTC), fiat)
-	}
-	for _, coin = range targets {
-		if state[coin].Balance > 0 {
-			if Logging {
+		for _, coin = range targets {
+			if state[coin].Balance > 0 {
 				Info.Printf("%v %v (%v %v) ", coin, fc(state[coin].Balance), fc(state[coin].FiatValue), fiat)
 			}
 		}
-	}
-	if Logging {
 		Info.Printf("BALANCE Total %v %v over %v coins", fc(basetotal), base, fragmenttotal)
 	}
-
-	///////////////////////////////////////////
-	// start off by getting all our open orders (that have not been fullfilled for whatever reason) and cancel them
-	if Logging {
-		Info.Println("CANCELLING ALL OPEN ORDERS")
-	}
-	//
-	if simulate == false {
-		if ok := CancelAllOpenOrders(base, targets); !ok {
-			if Logging {
-				Error.Println("Problem cancelling all open orders: bailing out.")
-			}
-			return
-		}
-	}
-
-	// TODO there may be coins cancelling or not yet canceled that will mess up the balance calcs!
 
 	////////////////////////////////////////////
 	// Analyse coins
@@ -158,20 +150,69 @@ func trade() {
 		// sort by ranking descending
 		sort.Slice(todo, func(i, j int) bool { return todo[i].ranking > todo[j].ranking })
 	}
-	//if Logging { Info.Printf("coin.action.rank %v",todo) }
+
+	////////////////////////////////////
+
+	PlaceBuyAndSellOrders(base, fragmenttotal, todo)
+
+	////////////////////////////////////
+	// Update state before saving
+	// TODO Pause here and perhaps await an update?
+
+	if Logging {
+		Info.Print("UPDATING STATS")
+	}
+	basetotal = state[base].Balance
+	state[base].FiatValue = basetotal * FIATBTC
+	state[base].BaseValue = basetotal
+	s := fmt.Sprintf("coin|balance|BTC|%v|held\n", fiat)
+	s += fmt.Sprintf("%v|%v|%v|%v|-\n", base, fc(basetotal), fc(basetotal), fn2(basetotal*FIATBTC))
+
+	for _, coin = range targets {
+		coinbalance = state[coin].Balance
+		inbase := ticker[base+"_"+coin].Last * coinbalance
+		basetotal += inbase
+		state[coin].FiatValue = inbase * FIATBTC
+		state[coin].BaseValue = inbase
+		dur := "-"
+		if !state[coin].Date.IsZero() && coinbalance > 0 {
+			dur = getTimeNow().Sub(state[coin].Date).String()
+		}
+		s += fmt.Sprintf("%v|%v|%v|%v|%v\n", coin, fc(coinbalance), fc(inbase), fn2(inbase*FIATBTC), dur)
+	}
+
+	state[TOTAL].Balance = basetotal
+	state[TOTAL].FiatValue = basetotal * FIATBTC
+	s += fmt.Sprintf("%v|%v|%v|%v|-\n", "TOTAL", fc(0), fc(basetotal), fn2(basetotal*FIATBTC))
+	// what a hack!
+	state[TOTAL].OrderNumber = s
+	state[TOTAL].Misc = fmt.Sprintf("%v", getTimeNow().Sub(state[START].Date))
+}
+
+func getTargettedCoins() (targets []string) {
+	targets = strings.Split(conf.GetString("Currency.targets"), ",")
+	if len(targets) == 0 {
+		targets = append(targets, conf.GetString("Currency.target"))
+	}
+	return
+}
+
+func getTimeNow() (now time.Time) {
+	return time.Now()
+}
+
+// buying and selling for each coin
+// using analysis to place our orders
+func PlaceBuyAndSellOrders(base string, fragmenttotal float64, todo []coinaction) {
 	///////////////////////////////////////////
-	// buying and selling for each coin
-	// taking our analysis place our orders
 
 	minbasetotrade := conf.GetFloat64("TradingRules.minbasetotrade")
 	maxfragments := conf.GetFloat64("TradingRules.fragments")
 	sales := 0
-	if maxfragments == 0 {
-		maxfragments = 1
-	}
 
 	for i, _ := range todo {
-		coin = todo[i].coin
+		coin := todo[i].coin
+
 		coinbalance := state[coin].Balance
 		action := todo[i].action
 		basebalance := state[base].Balance
@@ -216,52 +257,4 @@ func trade() {
 			}
 		}
 	}
-
-	////////////////////////////////////
-	//update state before saving
-
-	// TODO Pause here and perhaps await an update?
-
-	if Logging {
-		Info.Print("UPDATING STATS")
-	}
-	basetotal = state[base].Balance
-	state[base].FiatValue = basetotal * FIATBTC
-	state[base].BaseValue = basetotal
-	s := fmt.Sprintf("coin|balance|BTC|%v|held\n", fiat)
-	s += fmt.Sprintf("%v|%v|%v|%v|-\n", base, fc(basetotal), fc(basetotal), fn2(basetotal*FIATBTC))
-	for _, coin = range targets {
-		coinbalance = state[coin].Balance
-		inbase := ticker[base+"_"+coin].Last * coinbalance
-		basetotal += inbase
-		state[coin].FiatValue = inbase * FIATBTC
-		state[coin].BaseValue = inbase
-		dur := "-"
-		if !state[coin].Date.IsZero() && coinbalance > 0 {
-			dur = time.Now().Sub(state[coin].Date).String()
-		}
-		s += fmt.Sprintf("%v|%v|%v|%v|%v\n", coin, fc(coinbalance), fc(inbase), fn2(inbase*FIATBTC), dur)
-	}
-	state[TOTAL].Balance = basetotal
-	state[TOTAL].FiatValue = basetotal * FIATBTC
-	s += fmt.Sprintf("%v|%v|%v|%v|-\n", "TOTAL", fc(0), fc(basetotal), fn2(basetotal*FIATBTC))
-	// what a hack!
-	state[TOTAL].OrderNumber = s
-	state[TOTAL].Misc = fmt.Sprintf("%v", time.Now().Sub(state[START].Date))
-	////////////////////////////////////
-
-	if sss {
-		if Logging {
-			Info.Printf("SellSellSell run completed. %v sale(s) placed", sales)
-		}
-	}
-}
-
-func getTargettedCoins() (targets []string) {
-
-	targets = strings.Split(conf.GetString("Currency.targets"), ",")
-	if len(targets) == 0 {
-		targets = append(targets, conf.GetString("Currency.target"))
-	}
-	return
 }

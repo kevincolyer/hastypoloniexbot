@@ -103,6 +103,5 @@ func mergeData() {
 	}
 }
 
-
-//,"XMR_NXT":{"Last":"0.00056971","lowestAsk":"0.00058588","highestBid":"0.00057017","percentChange":"-0.1225241","baseVolume":"34.89409024","quoteVolume":"57047.21168544","isFrozen":"0"} 
+//,"XMR_NXT":{"Last":"0.00056971","lowestAsk":"0.00058588","highestBid":"0.00057017","percentChange":"-0.1225241","baseVolume":"34.89409024","quoteVolume":"57047.21168544","isFrozen":"0"}
 //  ,"[A-Z]+_[A-Z]+":\{.+\}

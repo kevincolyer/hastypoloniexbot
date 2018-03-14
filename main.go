@@ -39,7 +39,8 @@ var (
 	conf     *viper.Viper
 	exchange *poloniex.Poloniex
 	state    map[string]*coinstate
-	BotName       = "HastyPoloniexBot"
+	BotName  = "HastyPoloniexBot"
+	ticker   poloniex.Ticker
 	Logging  bool = false // initial state of logging
 
 //         state *viper.Viper
@@ -72,6 +73,8 @@ func ConfInit(config string) {
 	conf.SetConfigName(config) // name of config file (without extension)
 	// set defaults here
 	conf.SetDefault("Currency.target", "STR")
+	conf.SetDefault("TradingRules.fragments", 1)
+	conf.SetDefault("TradingRules.CoolOffDuration", "2h")
 	//
 	err := conf.ReadInConfig() // Find and read the config file
 	if err != nil {            // Handle errors reading the config file

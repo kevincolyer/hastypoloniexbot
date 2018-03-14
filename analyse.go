@@ -103,19 +103,19 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 
 	if Logging {
 		if trendingdown {
-			Info.Printf("ma diff %v is trending down from last diff %v\n", fc(pdiff(ema, sma)), fc(pdiff(lastema, lastsma)))
+			Info.Printf("ema diff %v is trending down from last diff %v\n", fc(pdiff(ema, sma)), fc(pdiff(lastema, lastsma)))
 		} else {
-			Info.Printf("ma diff %v is trending up from last diff %v\n", fc(pdiff(ema, sma)), fc(pdiff(lastema, lastsma)))
+			Info.Printf("ema diff %v is trending up from last diff %v\n", fc(pdiff(ema, sma)), fc(pdiff(lastema, lastsma)))
 		}
 	}
 
-	dur, err := time.ParseDuration(conf.GetString("TradingRules.CoolOffDuration"))
-	if err != nil {
-		dur, _ = time.ParseDuration("2h")
-		if Logging {
-			Warning.Printf("Couldn't parse CoolOffDuration (%v). Setting default to %v\n", conf.GetString("TradingRules.CoolOffDuration"), dur)
-		}
-	}
+	dur, _ := time.ParseDuration(conf.GetString("TradingRules.CoolOffDuration"))
+	// 	if err != nil {
+	// 		dur, _ = time.ParseDuration("2h")
+	// 		if Logging {
+	// 			Warning.Printf("Couldn't parse CoolOffDuration (%v). Setting default to %v\n", conf.GetString("TradingRules.CoolOffDuration"), dur)
+	// 		}
+	// 	}
 	if balance == 0 && lastsold.After(time.Now().Add(-dur)) {
 		cooloffperiod = true
 		//		if Logging { Info.Print(anal + "is in cooling off period") }

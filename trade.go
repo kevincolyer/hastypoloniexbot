@@ -205,7 +205,9 @@ func getTimeNow() (now time.Time) {
 // using analysis to place our orders
 func PlaceBuyAndSellOrders(base string, fragmenttotal float64, todo []coinaction) {
 	///////////////////////////////////////////
-
+        if Logging {
+			Info.Println("PLACING ORDERS")
+		}
 	minbasetotrade := conf.GetFloat64("TradingRules.minbasetotrade")
 	maxfragments := conf.GetFloat64("TradingRules.fragments")
 	sales := 0

@@ -103,9 +103,9 @@ func analyseChartData(c []float64, coin string) (advice int, ranking float64) {
 
 	if Logging {
 		if trendingdown {
-			Info.Printf("ema diff %v is trending down from last diff %v\n", fc(pdiff(ema, sma)), fc(pdiff(lastema, lastsma)))
+			Info.Printf(anal+"ema diff %v is trending down from last diff %v\n", fc(pdiff(ema, sma)), fc(pdiff(lastema, lastsma)))
 		} else {
-			Info.Printf("ema diff %v is trending up from last diff %v\n", fc(pdiff(ema, sma)), fc(pdiff(lastema, lastsma)))
+			Info.Printf(anal+"ema diff %v is trending up from last diff %v\n", fc(pdiff(ema, sma)), fc(pdiff(lastema, lastsma)))
 		}
 	}
 

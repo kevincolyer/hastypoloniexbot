@@ -133,9 +133,13 @@ func main() {
 	var config string
 	var collectdata bool
 	var mergedata bool
+	var preparedata bool
+	var trainmode bool
 	flag.StringVar(&config, "config", "config", "config file to use")
-	flag.BoolVar(&collectdata, "collectdata", false, "collect ticker data and save to data folder as unixtime.json")
-	flag.BoolVar(&mergedata, "mergedata", false, "Merge all collected ticker data and save to data folder")
+	flag.BoolVar(&collectdata, "collectdata", false, "collect ticker data and save to data folder as [unixtime].json")
+	flag.BoolVar(&mergedata, "mergedata", false, "Merge all collected ticker data and save to data folder as data.json")
+	flag.BoolVar(&preparedata, "preparedata", false, "Prepare collected ticker data for trianing runs")
+	flag.BoolVar(&trainmode, "train", false, "Start a training run")
 	flag.Parse()
 
 	// load config file
@@ -153,26 +157,43 @@ func main() {
 		Info.Println("STARTING HastyPoloniexBot VERSION " + VERSION + " Bot name:" + BotName)
 	}
 
+	// Special runing modes
 	if collectdata {
 		if Logging {
 			Info.Println("Collecting ticker data")
 		}
 		collectTickerData()
-		return
+		return // end program
 	}
 	if mergedata {
 		if Logging {
 			Info.Println("Merging ticker data")
 		}
 		mergeData()
-		return
+		return // end program
+	}
+	if preparedata {
+		if Logging {
+			Info.Println("Preparing ticker data")
+		}
+		prepareData()
+		return // end program
+	}
+	if trainmode {
+		if Logging {
+			Info.Println("Entering training mode")
+		}
+		train()
+		return // end program
 	}
 	if conf.GetBool("BotControl.Active") == false {
 		if Logging {
 			Info.Println("Active is FALSE - Quiting")
 		}
-		return
+		return // end program
 	}
+	
+	// Modes of operation
 	if conf.GetBool("BotControl.Simulate") {
 		if Logging {
 			Info.Println("Simulate Mode is ON")

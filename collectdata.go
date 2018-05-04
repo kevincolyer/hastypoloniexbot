@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
-    "strconv"
-    "sort" 
-    
+
 	"gitlab.com/wmlph/poloniex-api"
 )
 
@@ -108,7 +108,6 @@ func mergeData() {
 //,"XMR_NXT":{"Last":"0.00056971","lowestAsk":"0.00058588","highestBid":"0.00057017","percentChange":"-0.1225241","baseVolume":"34.89409024","quoteVolume":"57047.21168544","isFrozen":"0"}
 //  ,"[A-Z]+_[A-Z]+":\{.+\}
 
-
 /* TAKE COLLECTED DATA AND TRANSFORM INTO A DIFFERENT ORDERED FORM AND CALCULATE EMA SMA
  * STORE AS JSON TO BE USED FOR DRY RUNS
  */
@@ -118,8 +117,8 @@ func mergeData() {
 // map of pairs: slice of prices sorted by timestamp
 
 type (
-    pair            string // "BTC_STR"
-    
+	pair string // "BTC_STR"
+
 	TickerEntryPlus struct {
 		Last        float64 `json:",string"`
 		Ask         float64 `json:"lowestAsk,string"`
@@ -128,39 +127,35 @@ type (
 		BaseVolume  float64 `json:"baseVolume,string"`
 		QuoteVolume float64 `json:"quoteVolume,string"`
 		IsFrozen    int64   `json:"isFrozen,string"`
-		
-		Ema30       float64 `json:"ema30,string"`
-		Sma50       float64 `json:"sma50,string"`
-		Timestamp   int64   `json:"timestamp,string"`  // TODO not expoterd!!! Capitalise to export...
+
+		Ema30     float64 `json:"ema30,string"`
+		Sma50     float64 `json:"sma50,string"`
+		Timestamp int64   `json:"timestamp,string"` // TODO not expoterd!!! Capitalise to export...
 	}
-	
-	TickerPlus      map[pair]TickerEntryPlus
-	
-	TrainingData   map[pair][]TickerEntryPlus
+
+	TickerPlus map[pair]TickerEntryPlus
+
+	TrainingData map[pair][]TickerEntryPlus
 )
 
-
-
-
 func prepareData() {
-    // test to see if data has been collected
-    // init data structures
-    // call mergeData() 
-    // if success...
-    //  open data file
-    //  unmarshall
-    //  stuff into new data structure
-    //  
-    // for each pair:
-    //  for each timestamp in order
-    //   calc sma
-    //   calc ema
-    //  truncate EMA-SMA of data
-    //
-    // save
-    
-    myTrainingData:=make(map[pair][]TickerEntryPlus)
-    
+	// test to see if data has been collected
+	// init data structures
+	// call mergeData()
+	// if success...
+	//  open data file
+	//  unmarshall
+	//  stuff into new data structure
+	//
+	// for each pair:
+	//  for each timestamp in order
+	//   calc sma
+	//   calc ema
+	//  truncate EMA-SMA of data
+	//
+	// save
+
+	myTrainingData := make(map[pair][]TickerEntryPlus)
 
 	// open data directory
 	files, err := ioutil.ReadDir("data")
@@ -172,13 +167,15 @@ func prepareData() {
 	}
 
 	// open each file
-	for _, file := range files {
+	for i, file := range files {
 		fname := strings.Split(file.Name(), ".")
 		filename := "data/" + file.Name()
 
+		fmt.Printf("\rReading file %v/%v ", i+1, len(files))
+
 		// filter the directory listing...
-        timestamp,err := strconv.Atoi(fname[0])
-        if len(fname) != 2 || fname[1] != "json" || err != nil { 
+		timestamp, err := strconv.Atoi(fname[0])
+		if len(fname) != 2 || fname[1] != "json" || err != nil {
 			if Logging {
 				Info.Print("skipping " + filename)
 			}
@@ -193,34 +190,40 @@ func prepareData() {
 			}
 			continue
 		}
-		fmt.Println(fname,len(data))
+		//fmt.Println(fname,len(data))
 
-        myTickerPlus:=make(map[pair]TickerEntryPlus)
-        
-        err= json.Unmarshal(data, &myTickerPlus)
+		myTickerPlus := make(map[pair]TickerEntryPlus)
+
+		err = json.Unmarshal(data, &myTickerPlus)
 		if err != nil {
 			panic(fmt.Errorf("Fatal error unmarshalling data file: %s \n", err))
 		}
 
-        for myPair,myTickerEntry:=range myTickerPlus {
-            myTickerEntry.Timestamp=int64(timestamp)
-            myTickerEntry.Ema30=30
-            myTickerEntry.Sma50=50
-            myTrainingData[myPair]=append(myTrainingData[myPair],myTickerEntry)
-        }
-    } // end for each file
+		// remap data and apply some filtering...
+		for myPair, myTickerEntry := range myTickerPlus {
+			// filter out non BTC
+			if !strings.HasPrefix(string(myPair), "BTC_") {
+				continue
+			}
+			myTickerEntry.Timestamp = int64(timestamp)
+			myTickerEntry.Ema30 = 30
+			myTickerEntry.Sma50 = 50
+			myTrainingData[myPair] = append(myTrainingData[myPair], myTickerEntry)
+		}
+	} // end for each file
 
-    
-    // data is currently unsorted. sort on timestamp key here
-    for myPair,_:=range myTrainingData {
-        sort.Slice(myTrainingData[myPair],func(i,j int) bool { return myTrainingData[myPair][i].Timestamp<myTrainingData[myPair][j].Timestamp})
-    }
-    // do transforms on data
-    
-    // TODO
-    
-    // marshall to json and save
-    j, err := json.Marshal(myTrainingData)
+	fmt.Println("Sorting...")
+	// data is currently unsorted. sort on timestamp key here
+	for myPair, _ := range myTrainingData {
+		sort.Slice(myTrainingData[myPair], func(i, j int) bool { return myTrainingData[myPair][i].Timestamp < myTrainingData[myPair][j].Timestamp })
+	}
+	// do transforms on data
+	fmt.Printf("\rPre-caching Moving Average %v   ", "BTC_STR") //myPair)
+	fmt.Println()
+	// TODO
+
+	// marshall to json and save
+	j, err := json.Marshal(myTrainingData)
 	if err != nil {
 		panic(fmt.Errorf("Fatal error marshalling json for training data: %s \n", err))
 	}
@@ -232,11 +235,10 @@ func prepareData() {
 	if Logging {
 		Info.Println(file + " written ok.")
 	}
-    
-}
 
+}
 
 // move to own file...
 func train() {
-    return
+	return
 }

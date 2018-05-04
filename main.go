@@ -192,7 +192,7 @@ func main() {
 		}
 		return // end program
 	}
-	
+
 	// Modes of operation
 	if conf.GetBool("BotControl.Simulate") {
 		if Logging {

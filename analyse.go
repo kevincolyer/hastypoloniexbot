@@ -12,7 +12,8 @@ func CalcEMA(closes []float64, periods int) (ema float64) {
 	// note closes is sorted in reverse order, with current at 0 and 50th prev data point at 49
 
 	//     Initial SMA: 10-period sum / 10
-	ema = CalcSMA(closes, periods, periods+1)
+	//ema = CalcSMA(closes, periods, periods+1)
+	ema = CalcSMA(closes, 10, periods+10+1)
 
 	//     Multiplier: (2 / (Time periods + 1) ) = (2 / (10 + 1) ) = 0.1818 (18.18%)
 	mult := 2.0 / (float64(periods + 1)) // the traditional form // mult:= 1/float64(periods) // wilder form

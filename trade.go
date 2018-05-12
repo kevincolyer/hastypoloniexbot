@@ -9,37 +9,37 @@ import (
 	"gitlab.com/wmlph/poloniex-api"
 )
 
-func trade() {
+func (b *Bot) Trade() {
 	/////////////////////////////////////
 	// get poloniex data and set up variables from config file
-	if Logging {
+	if b.Logging {
 		Info.Println("GETTING POLONIEX DATA")
 	}
 
-	//if Logging { Info.Printf("%v%v", conf.GetString("Credentials.apikey"),conf.GetString("Credentials.secret")) }
-	exchange = poloniex.NewKS(
-		conf.GetString("Credentials.apikey"),
-		conf.GetString("Credentials.secret")) // check for failure needed here?
+	b.Exchange = poloniex.NewKS(
+		b.Conf.GetString("Credentials.apikey"),
+		b.Conf.GetString("Credentials.secret")) // check for failure needed here?
 
 	// Get Ticker
 	// {Last, Ask, Bid,Change,BaseVolume,QuoteVolume,IsFrozen}
-	ticker, err := exchange.Ticker()
+    var err error
+	b.Ticker,err = b.Exchange.Ticker()
 	if err != nil {
-		if Logging {
+		if b.Logging {
 			Error.Printf("Fatal error getting ticker data from poloniex: %v", err)
 		}
 		return
 	}
-
+//     b.Ticker=ticker
 	// set up some variables from config
-	fiat := conf.GetString("Currency.Fiat")
-	FIATBTC := ticker[fiat+"_BTC"].Last // can be other curency than usdt
-	base := conf.GetString("Currency.Base")
-	sss := conf.GetBool("BotControl.SellSellSell")
-	simulate := conf.GetBool("BotControl.Simulate")
+	fiat := b.Conf.GetString("Currency.Fiat")
+	FIATBTC := b.Ticker[fiat+"_BTC"].Last // can be other curency than usdt
+	base := b.Conf.GetString("Currency.Base")
+	sss := b.Conf.GetBool("BotControl.SellSellSell")
+	simulate := b.Conf.GetBool("BotControl.Simulate")
 
 	// get list of coins we are targetting
-	targets := getTargettedCoins()
+	targets := b.GetTargettedCoins()
 	sort.Strings(targets)
 
 	var coinbalance float64
@@ -52,11 +52,11 @@ func trade() {
 	// start off by getting all our open orders (that have not been fullfilled for whatever reason) and cancel them
 	//
 	if simulate == false {
-		if Logging {
+		if b.Logging {
 			Info.Println("CANCELLING ALL OPEN ORDERS")
 		}
-		if ok := CancelAllOpenOrders(base, targets); !ok {
-			if Logging {
+		if ok := b.CancelAllOpenOrders(base, targets); !ok {
+			if b.Logging {
 				Error.Println("Problem cancelling all open orders: bailing out.")
 			}
 			return
@@ -70,36 +70,36 @@ func trade() {
 
 	// get balance of base currency only if not simulating!
 	if simulate == false {
-		balances, err = exchange.AvailableAccountBalances() // kpc added this function
+		balances, err = b.Exchange.AvailableAccountBalances() // kpc added this function
 		if err != nil {
-			if Logging {
+			if b.Logging {
 				Error.Printf("Failed to get coin AccountBalances from poloniex: %v", err)
 			}
 		}
-		state[base].Balance = balances.Exchange[base]
+		b.State[base].Balance = balances.Exchange[base]
 		// + balances[base].OnOrders // include open buy orders - they will get cancelled below. Posssible race condition here!
 	}
 
 	// more variables now we know them
-	basebalance := state[base].Balance // SIMULATION
+	basebalance := b.State[base].Balance // SIMULATION
 	basetotal := basebalance
-	state[base].FiatValue = basebalance * FIATBTC
-	state[base].BaseValue = basebalance // for completeness
+	b.State[base].FiatValue = basebalance * FIATBTC
+	b.State[base].BaseValue = basebalance // for completeness
 
 	for _, coin = range targets {
 		// if we have not loaded this coin from json, we need to add it to the map.
-		if _, ok := state[coin]; !ok {
-			state[coin] = &coinstate{Coin: coin, Balance: 0.0}
+		if _, ok := b.State[coin]; !ok {
+			b.State[coin] = &coinstate{Coin: coin, Balance: 0.0}
 		}
 
 		if simulate {
-			coinbalance = state[coin].Balance // SIMULATION!
+			coinbalance = b.State[coin].Balance // SIMULATION!
 		} else {
 			coinbalance = balances.Exchange[coin] // REAL THING!
 		}
 
-		infiat := ticker[base+"_"+coin].Last * coinbalance * FIATBTC
-		inbase := ticker[base+"_"+coin].Last * coinbalance
+		infiat := b.Ticker[base+"_"+coin].Last * coinbalance * FIATBTC
+		inbase := b.Ticker[base+"_"+coin].Last * coinbalance
 
 		action := NOACTION
 		if coinbalance > 0 {
@@ -109,26 +109,26 @@ func trade() {
 				action = SELL
 			}
 		}
-		todo = append(todo, coinaction{coin: coin, action: action}) // used to prepare todo slice for use in sellsellsell
-		state[coin].Balance = coinbalance
-		state[coin].FiatValue = infiat
-		state[coin].BaseValue = inbase
+		todo = append(todo, coinaction{Coin: coin, Action: action}) // used to prepare todo slice for use in sellsellsell
+		b.State[coin].Balance = coinbalance
+		b.State[coin].FiatValue = infiat
+		b.State[coin].BaseValue = inbase
 	}
-	state[TOTAL].Balance = basetotal
-	state[TOTAL].FiatValue = basetotal * FIATBTC
+	b.State[TOTAL].Balance = basetotal
+	b.State[TOTAL].FiatValue = basetotal * FIATBTC
 
 	// if first run and state not prev saved then mark our start position for statistical evaluation
-	if _, ok := state[START]; !ok {
-		state[START] = &coinstate{Coin: base, Balance: basebalance, Date: getTimeNow(), FiatValue: state[base].FiatValue}
+	if _, ok := b.State[START]; !ok {
+		b.State[START] = &coinstate{Coin: base, Balance: basebalance, Date: getTimeNow(), FiatValue: b.State[base].FiatValue}
 	}
 
-	if Logging {
+	if b.Logging {
 		// print current balances to log
 		Info.Print("BALANCES (PROVISIONAL - ORDERS PENDING/CANCELLING)")
 		Info.Printf("%v %v (%v %v) ", base, fc(basebalance), fc(basebalance*FIATBTC), fiat)
 		for _, coin = range targets {
-			if state[coin].Balance > 0 {
-				Info.Printf("%v %v (%v %v) ", coin, fc(state[coin].Balance), fc(state[coin].FiatValue), fiat)
+			if b.State[coin].Balance > 0 {
+				Info.Printf("%v %v (%v %v) ", coin, fc(b.State[coin].Balance), fc(b.State[coin].FiatValue), fiat)
 			}
 		}
 		Info.Printf("BALANCE Total %v %v over %v coins", fc(basetotal), base, fragmenttotal)
@@ -138,61 +138,61 @@ func trade() {
 	// Analyse coins
 	// for each coin get Analyse() to evaluate buy/sell and give a ranking of how strongly it is growing so we can prioritise
 	if sss == false {
-		if Logging {
+		if b.Logging {
 			Info.Println("ANALYSING DATA")
 		}
 
 		for i, _ := range todo {
-			action, ranking := Analyse(todo[i].coin)
-			todo[i].action = action
-			todo[i].ranking = ranking
+			action, ranking := b.Analyse(todo[i].Coin)
+			todo[i].Action = action
+			todo[i].Ranking = ranking
 		}
 		// sort by ranking descending
-		sort.Slice(todo, func(i, j int) bool { return todo[i].ranking > todo[j].ranking })
+		sort.Slice(todo, func(i, j int) bool { return todo[i].Ranking > todo[j].Ranking })
 	}
 
 	////////////////////////////////////
 
-	PlaceBuyAndSellOrders(base, fragmenttotal, todo)
+	b.PlaceBuyAndSellOrders(base, fragmenttotal, todo)
 
 	////////////////////////////////////
 	// Update state before saving
 	// TODO Pause here and perhaps await an update?
 
-	if Logging {
+	if b.Logging {
 		Info.Print("UPDATING STATS")
 	}
-	basetotal = state[base].Balance
-	state[base].FiatValue = basetotal * FIATBTC
-	state[base].BaseValue = basetotal
+	basetotal = b.State[base].Balance
+	b.State[base].FiatValue = basetotal * FIATBTC
+	b.State[base].BaseValue = basetotal
 	s := fmt.Sprintf("coin|balance|BTC|%v|held\n", fiat)
 	s += fmt.Sprintf("%v|%v|%v|%v|-\n", base, fc(basetotal), fc(basetotal), fn2(basetotal*FIATBTC))
 
 	for _, coin = range targets {
-		coinbalance = state[coin].Balance
-		inbase := ticker[base+"_"+coin].Last * coinbalance
+		coinbalance = b.State[coin].Balance
+		inbase := b.Ticker[base+"_"+coin].Last * coinbalance
 		basetotal += inbase
-		state[coin].FiatValue = inbase * FIATBTC
-		state[coin].BaseValue = inbase
+		b.State[coin].FiatValue = inbase * FIATBTC
+		b.State[coin].BaseValue = inbase
 		dur := "-"
-		if !state[coin].Date.IsZero() && coinbalance > 0 {
-			dur = getTimeNow().Sub(state[coin].Date).String()
+		if !b.State[coin].Date.IsZero() && coinbalance > 0 {
+			dur = getTimeNow().Sub(b.State[coin].Date).String()
 		}
 		s += fmt.Sprintf("%v|%v|%v|%v|%v\n", coin, fc(coinbalance), fc(inbase), fn2(inbase*FIATBTC), dur)
 	}
 
-	state[TOTAL].Balance = basetotal
-	state[TOTAL].FiatValue = basetotal * FIATBTC
+	b.State[TOTAL].Balance = basetotal
+	b.State[TOTAL].FiatValue = basetotal * FIATBTC
 	s += fmt.Sprintf("%v|%v|%v|%v|-\n", "TOTAL", fc(0), fc(basetotal), fn2(basetotal*FIATBTC))
 	// what a hack!
-	state[TOTAL].OrderNumber = s
-	state[TOTAL].Misc = fmt.Sprintf("%v", getTimeNow().Sub(state[START].Date))
+	b.State[TOTAL].OrderNumber = s
+	b.State[TOTAL].Misc = fmt.Sprintf("%v", getTimeNow().Sub(b.State[START].Date))
 }
 
-func getTargettedCoins() (targets []string) {
-	targets = strings.Split(conf.GetString("Currency.targets"), ",")
+func (b *Bot) GetTargettedCoins() (targets []string) {
+	targets = strings.Split(b.Conf.GetString("Currency.targets"), ",")
 	if len(targets) == 0 {
-		targets = append(targets, conf.GetString("Currency.target"))
+		targets = append(targets, b.Conf.GetString("Currency.target"))
 	}
 	return
 }
@@ -203,28 +203,28 @@ func getTimeNow() (now time.Time) {
 
 // buying and selling for each coin
 // using analysis to place our orders
-func PlaceBuyAndSellOrders(base string, fragmenttotal float64, todo []coinaction) {
+func (b *Bot)  PlaceBuyAndSellOrders(base string, fragmenttotal float64, todo []coinaction) {
 	///////////////////////////////////////////
-	if Logging {
+	if b.Logging {
 		Info.Println("PLACING ORDERS")
 	}
-	minbasetotrade := conf.GetFloat64("TradingRules.minbasetotrade")
-	maxfragments := conf.GetFloat64("TradingRules.fragments")
+	minbasetotrade := b.Conf.GetFloat64("TradingRules.minbasetotrade")
+	maxfragments := b.Conf.GetFloat64("TradingRules.fragments")
 	sales := 0
 
 	for i, _ := range todo {
-		coin := todo[i].coin
+		coin := todo[i].Coin
 
-		coinbalance := state[coin].Balance
-		action := todo[i].action
-		basebalance := state[base].Balance
+		coinbalance := b.State[coin].Balance
+		action := todo[i].Action
+		basebalance := b.State[base].Balance
 
 		if action == BUY && coinbalance == 0 {
 			// check enough balance to make an order (minorder)
 			// get current asking price
 			if basebalance > minbasetotrade {
-				throttle()
-				if Logging {
+				Throttle()
+				if b.Logging {
 					Info.Println(coin + " Placing BUY  order")
 				}
 				// TODO need to figure out fragments better - especially if an order does not sell or buy!!!
@@ -232,10 +232,10 @@ func PlaceBuyAndSellOrders(base string, fragmenttotal float64, todo []coinaction
 					fragmenttotal++
 					basebalance = basebalance * (fragmenttotal / maxfragments)
 				}
-				Buy(base, coin, ticker[base+"_"+coin].Ask, basebalance)
+				b.Buy(base, coin, b.Ticker[base+"_"+coin].Ask, basebalance)
 
 			} else {
-				if Logging {
+				if b.Logging {
 					Info.Printf(coin+" buy: balance of %v is lower (%v) than minbasetotrade rule (%v) Can't place buy order", base, fc(basebalance), fc(minbasetotrade))
 				}
 			}
@@ -244,17 +244,17 @@ func PlaceBuyAndSellOrders(base string, fragmenttotal float64, todo []coinaction
 		if action == SELL {
 			// get current bidding price
 			// get balance and sell all
-			throttle()
-			if Logging {
+			Throttle()
+			if b.Logging {
 				Info.Println(coin + " Placing SELL order")
 			}
-			Sell(base, coin, ticker[base+"_"+coin].Bid, coinbalance)
+			b.Sell(base, coin, b.Ticker[base+"_"+coin].Bid, coinbalance)
 			sales++
 		}
 
 		if action == NOACTION {
 
-			if Logging {
+			if b.Logging {
 				Info.Print(coin + " Nothing to do")
 			}
 		}

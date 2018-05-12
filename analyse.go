@@ -36,17 +36,17 @@ func CalcSMA(closes []float64, periods, offset int) (sma float64) {
 	return
 }
 
-func Analyse(coin string) (advice int, ranking float64) {
+func (b *Bot) Analyse(coin string) (advice action, ranking float64) {
 	advice = NOACTION
-	pair := conf.GetString("Currency.Base") + "_" + coin
-	period := conf.GetInt("Analysis.period")
-	if Logging {
+	pair := b.Conf.GetString("Currency.Base") + "_" + coin
+	period := b.Conf.GetInt("Analysis.period")
+	if b.Logging {
 		Info.Printf(coin+" Analysis using ema and sma for period of %v\n", period)
 	}
 	// get chartdata from polo for coin
-	data, err := exchange.ChartDataPeriod(pair, period)
+	data, err := b.Exchange.ChartDataPeriod(pair, period)
 	if err != nil {
-		if Logging {
+		if b.Logging {
 			Warning.Printf("Could not retrieve data for pair %s. Error %v\n", pair, err)
 		}
 		return
@@ -55,39 +55,39 @@ func Analyse(coin string) (advice int, ranking float64) {
 
 	d := analysisdata{coin: coin}
 
-	d.emaperiods = conf.GetInt("Analysis.ema")
-	d.smaperiods = conf.GetInt("Analysis.sma")
+	d.emaperiods = b.Conf.GetInt("Analysis.ema")
+	d.smaperiods = b.Conf.GetInt("Analysis.sma")
 	d.sma = CalcSMA(closings, d.smaperiods, 0)
 	d.ema = CalcEMA(closings, d.emaperiods)
 
-	d.coinbalance = state[coin].Balance
-	d.lastcoin = state[LAST].Coin
-	d.purchasedate = state[coin].Date
-	d.lastsold = state[coin].SaleDate
-	d.lastema = state[coin].LastEma
-	d.lastsma = state[coin].LastSma
-	state[coin].LastEma = d.ema
-	state[coin].LastSma = d.sma
-	d.cooloffduration, _ = time.ParseDuration(conf.GetString("TradingRules.CoolOffDuration"))
+	d.coinbalance = b.State[coin].Balance
+	d.lastcoin = b.State[LAST].Coin
+	d.purchasedate = b.State[coin].Date
+	d.lastsold = b.State[coin].SaleDate
+	d.lastema = b.State[coin].LastEma
+	d.lastsma = b.State[coin].LastSma
+	b.State[coin].LastEma = d.ema
+	b.State[coin].LastSma = d.sma
+	d.cooloffduration, _ = time.ParseDuration(b.Conf.GetString("TradingRules.CoolOffDuration"))
 	// 	if err != nil {
 	// 		dur, _ = time.ParseDuration("2h")
-	// 		if Logging {
-	// 			Warning.Printf("Couldn't parse CoolOffDuration (%v). Setting default to %v\n", conf.GetString("TradingRules.CoolOffDuration"), dur)
+	// 		if b.Logging {
+	// 			Warning.Printf("Couldn't parse CoolOffDuration (%v). Setting default to %v\n", b.Conf.GetString("TradingRules.CoolOffDuration"), dur)
 	// 		}
 	// 	}
 	if d.coinbalance == 0 && d.lastsold.After(time.Now().Add(-d.cooloffduration)) {
 		d.cooloffperiod = true
 	}
 
-	d.triggerbuy = conf.GetFloat64("TradingRules.triggerbuy")
-	d.purchaseprice = state[coin].PurchasePrice
+	d.triggerbuy = b.Conf.GetFloat64("TradingRules.triggerbuy")
+	d.purchaseprice = b.State[coin].PurchasePrice
 	d.currentprice = closings[0] // TODO need a better indicator
-	d.maxlosstorisk = conf.GetFloat64("TradingRules.maxlosstorisk")
-	d.triggersell = conf.GetFloat64("TradingRules.triggersell")
-	d.maxgrowth = conf.GetFloat64("TradingRules.maxgrowth")
+	d.maxlosstorisk = b.Conf.GetFloat64("TradingRules.maxlosstorisk")
+	d.triggersell = b.Conf.GetFloat64("TradingRules.triggersell")
+	d.maxgrowth = b.Conf.GetFloat64("TradingRules.maxgrowth")
 	d.HeldForLongEnough = d.purchasedate.After(time.Now().Add(-time.Hour * 22)) // yuk
 
-	return analyseChartData(d)
+	return b.AnalyseChartData(d)
 }
 
 type analysisdata struct {
@@ -117,14 +117,14 @@ type analysisdata struct {
 	maxgrowth         float64
 }
 
-func analyseChartData(d analysisdata) (advice int, ranking float64) {
+func (b *Bot) AnalyseChartData(d analysisdata) (advice action, ranking float64) {
 	ranking = 0
 	diff := d.ema - d.sma
 	advice = NOACTION
 	anal := d.coin + " "
 	trendingdown := pdiff(d.ema, d.sma) < pdiff(d.lastema, d.lastsma)
 
-	if Logging {
+	if b.Logging {
 		if trendingdown {
 			Info.Printf(anal+"ema diff %v is trending down from last diff %v\n", fc(pdiff(d.ema, d.sma)), fc(pdiff(d.lastema, d.lastsma)))
 		} else {
@@ -132,7 +132,7 @@ func analyseChartData(d analysisdata) (advice int, ranking float64) {
 		}
 	}
 
-	if Logging {
+	if b.Logging {
 		if d.coinbalance > 0 {
 			Info.Printf(anal+"Currently holding %v\n", fc(d.coinbalance))
 		} else {
@@ -150,28 +150,28 @@ func analyseChartData(d analysisdata) (advice int, ranking float64) {
 	if d.coinbalance == 0 {
 		// if last coin sold is this coin then do nothing (cooling off period)
 		if d.cooloffperiod {
-			if Logging {
+			if b.Logging {
 				Info.Printf(anal+" in cooling off period. Not Buying.\n", d.lastcoin)
 			}
 			return
 		}
 		// if ema<sma advice nothing return
 		if d.ema < d.sma {
-			if Logging {
+			if b.Logging {
 				Info.Printf(anal + "ema is less than sma - coin trending down not a good buy\n")
 			}
 			return
 		}
 		ranking = diff / d.sma
 		if d.ema > d.sma && ranking < d.triggerbuy {
-			if Logging {
+			if b.Logging {
 				Info.Printf(anal+"ema greater than sma but not by triggerbuy limit:%v %% (%v %%)\n", fp2(ranking), fp2(d.triggerbuy))
 			}
 			return
 
 		}
 		// ema>sma by triggerbuy...
-		if Logging {
+		if b.Logging {
 			Info.Printf(anal+"Recommend BUY ranking %v above triggerbuy %v\n", fp2(ranking), fp2(d.triggerbuy))
 		}
 		advice = BUY // only recommended as  coinbalance ==0
@@ -184,29 +184,29 @@ func analyseChartData(d analysisdata) (advice int, ranking float64) {
 		percentloss = 0
 	}
 	// sell if trending down (buy back should be delayed a few hours)
-	if Logging {
+	if b.Logging {
 		Info.Printf(anal+"PurchasePrice %v currentprice %v percentloss %v %v purchasedate %v lastsale %v \n", fc(d.purchaseprice), fc(d.currentprice), fn(percentloss), fn(pl), d.purchasedate, d.lastsold)
 	}
 
 	// 	if coinbalance > 0 && percentloss < 0 {
 	//
 	// 		if -percentloss < maxlosstorisk {
-	// 			if Logging { Warning.Printf(anal+"Price is %v %% below purchase price but not at maxlosstorisk %v %%\n", fp2(percentloss), fp2(maxlosstorisk)) }
+	// 			if b.Logging { Warning.Printf(anal+"Price is %v %% below purchase price but not at maxlosstorisk %v %%\n", fp2(percentloss), fp2(maxlosstorisk)) }
 	// 			return
 	// 		}
 	// 		advice = SELL
-	// 		if Logging { Info.Printf(anal+"Price is %v %% below purchase price and greater than maxlosstorisk %v %%. Advice SELL\n", fp2(percentloss), fp2(maxlosstorisk)) }
+	// 		if b.Logging { Info.Printf(anal+"Price is %v %% below purchase price and greater than maxlosstorisk %v %%. Advice SELL\n", fp2(percentloss), fp2(maxlosstorisk)) }
 	// 		return
 	// 	}
 	// 		if coinbalance > 0 &&  currentprice < purchaseprice {
 	// 			advice = SELL
-	// 			if Logging { Info.Printf(anal+"Recommend SELL as currentprice %v is less than purchased price %v\n", fc(currentprice), fc(purchaseprice)) }
+	// 			if b.Logging { Info.Printf(anal+"Recommend SELL as currentprice %v is less than purchased price %v\n", fc(currentprice), fc(purchaseprice)) }
 	// 			return
 	// 		}
 	// ma diff is lower than triggersell
 	if d.coinbalance > 0 && diff/d.sma < d.triggersell {
 		advice = SELL
-		if Logging {
+		if b.Logging {
 			Info.Printf(anal+"Recommend SELL as ema-sma/sma %v is less than triggersell %v\n", fp(diff/d.sma), fp(d.triggersell))
 		}
 		return
@@ -217,14 +217,14 @@ func analyseChartData(d analysisdata) (advice int, ranking float64) {
 		// curent price < purchase price-allowable loss the advice = sell
 		if percentloss < 0 && -percentloss > d.maxlosstorisk {
 			advice = SELL
-			if Logging {
+			if b.Logging {
 				Info.Printf(anal+"Recommend SELL as loss %v %% is less than maxlosstorisk %v %%\n", fp2(percentloss), fp2(d.maxlosstorisk))
 			}
 			return
 		}
 		// current price > purchase price info - keep - coin is growing in value
 		if percentloss == 0 {
-			if Logging {
+			if b.Logging {
 				Warning.Printf(anal + "Coin is in profit and growing in value but trending down")
 			}
 			return
@@ -234,20 +234,20 @@ func analyseChartData(d analysisdata) (advice int, ranking float64) {
 	}
 	growth := (d.currentprice - d.purchaseprice) / d.purchaseprice
 	if d.coinbalance > 0 && growth > d.maxgrowth {
-		if Logging {
+		if b.Logging {
 			Info.Printf(anal+"SELL:  %v times greater than purchase price - triggered maxgrowth %v\n", fn(growth), fn(d.maxgrowth))
 		}
 		advice = SELL
 		return
 	}
 	if d.coinbalance > 0 && d.HeldForLongEnough {
-		if Logging {
+		if b.Logging {
 			Info.Printf(anal + "SELL: Held for long enough threshold exceeded.\n")
 		}
 		advice = SELL
 		return
 	}
-	if Logging {
+	if b.Logging {
 		Info.Print(anal + "Nothing to do. No concerns")
 	}
 	return

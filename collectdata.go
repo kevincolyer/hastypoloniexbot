@@ -12,20 +12,20 @@ import (
 	"gitlab.com/wmlph/poloniex-api"
 )
 
-func collectTickerData() {
+func (b *Bot) CollectTickerData() {
 	/////////////////////////////////////
 	// get poloniex data and set up variables from config file
 
-	//if Logging { Info.Printf("%v%v", conf.GetString("Credentials.apikey"),conf.GetString("Credentials.secret")) }
-	exchange = poloniex.NewKS(
-		conf.GetString("Credentials.apikey"),
-		conf.GetString("Credentials.secret")) // check for failure needed here?
+	//if b.Logging { Info.Printf("%v%v", b.Conf.GetString("Credentials.apikey"),b.Conf.GetString("Credentials.secret")) }
+	b.Exchange = poloniex.NewKS(
+		b.Conf.GetString("Credentials.apikey"),
+		b.Conf.GetString("Credentials.secret")) // check for failure needed here?
 
 	// Get Ticker
 	// {Last, Ask, Bid,Change,BaseVolume,QuoteVolume,IsFrozen}
-	ticker, err := exchange.Ticker()
+	ticker, err := b.Exchange.Ticker()
 	if err != nil {
-		if Logging {
+		if b.Logging {
 			Error.Printf("Fatal error getting ticker data from poloniex: %v", err)
 		}
 		return
@@ -41,15 +41,15 @@ func collectTickerData() {
 	if err != nil {
 		panic(fmt.Errorf("Fatal error writing data file: %s \n", err))
 	}
-	if Logging {
+	if b.Logging {
 		Info.Println(file + " written ok.")
 	}
 }
 
-func mergeData() {
+func (b *Bot) MergeData() {
 	files, err := ioutil.ReadDir("data")
 	if err != nil {
-		if Logging {
+		if b.Logging {
 			Error.Printf("Fatal error reading data directory: %v (is it created?)", err)
 		}
 		return
@@ -62,7 +62,7 @@ func mergeData() {
 
 		// filter the directory listing...
 		if len(fname) != 2 || fname[1] != "json" || fname[0] == "data" {
-			if Logging {
+			if b.Logging {
 				Info.Print("skipping " + filename)
 			}
 			continue
@@ -71,7 +71,7 @@ func mergeData() {
 		// read the file data...
 		data, err := ioutil.ReadFile(filename)
 		if err != nil {
-			if Logging {
+			if b.Logging {
 				Info.Print(fmt.Errorf("Fatal error reading file: (%s) %s ", filename, err))
 			}
 			continue
@@ -80,7 +80,7 @@ func mergeData() {
 		// filter data to remove
 		// ...
 
-		// if Logging { Info.Print("merging "+filename) }
+		// if b.Logging { Info.Print("merging "+filename) }
 		if len(merged) > 1 {
 			merged += ",\n"
 		}
@@ -88,7 +88,7 @@ func mergeData() {
 	}
 	merged += "}" // "}\n"
 	if merged == "{}" {
-		if Logging {
+		if b.Logging {
 			Info.Print("No data to merge. Not writing data/data.json")
 		}
 		return
@@ -96,11 +96,11 @@ func mergeData() {
 
 	err = ioutil.WriteFile("data/data.json", []byte(merged), 0664)
 	if err != nil {
-		if Logging {
+		if b.Logging {
 			Error.Printf("Fatal error writing data file: %s ", err)
 		}
 	}
-	if Logging {
+	if b.Logging {
 		Info.Println("data.json written ok.")
 	}
 }
@@ -138,7 +138,7 @@ type (
 	TrainingData map[pair][]TickerEntryPlus
 )
 
-func prepareData() {
+func (b *Bot) PrepareData() {
 	// test to see if data has been collected
 	// init data structures
 	// call mergeData()
@@ -160,7 +160,7 @@ func prepareData() {
 	// open data directory
 	files, err := ioutil.ReadDir("data")
 	if err != nil {
-		if Logging {
+		if b.Logging {
 			Error.Printf("Fatal error reading data directory: %v (is it created?)", err)
 		}
 		return
@@ -176,7 +176,7 @@ func prepareData() {
 		// filter the directory listing...
 		timestamp, err := strconv.Atoi(fname[0])
 		if len(fname) != 2 || fname[1] != "json" || err != nil {
-			if Logging {
+			if b.Logging {
 				Info.Print("skipping " + filename)
 			}
 			continue
@@ -185,7 +185,7 @@ func prepareData() {
 		// read the file data...
 		data, err := ioutil.ReadFile(filename)
 		if err != nil {
-			if Logging {
+			if b.Logging {
 				Info.Print(fmt.Errorf("Fatal error reading file: (%s) %s ", filename, err))
 			}
 			continue
@@ -232,13 +232,25 @@ func prepareData() {
 	if err != nil {
 		panic(fmt.Errorf("Fatal error writing data file: %s \n", err))
 	}
-	if Logging {
+	if b.Logging {
 		Info.Println(file + " written ok.")
 	}
 
 }
 
+
+func loadPreparedData() *TrainingData {
+    // check it exists
+    myTrainingData := make(TrainingData)
+//     myTrainingData := make(map[pair][]TickerEntryPlus)
+    // load and unmarshall
+    // sort
+    
+    // return
+	return &myTrainingData
+}
+
 // move to own file...
-func train() {
-	return
+func (b *Bot) Train()  {
+
 }

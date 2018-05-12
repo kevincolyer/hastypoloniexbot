@@ -12,6 +12,29 @@ import (
 	"gitlab.com/wmlph/poloniex-api"
 )
 
+type (
+	pair string // "BTC_STR"
+
+	// NOTE: to make a part of the struct not export (it will not import) just change the initial letter to lowercase
+	TickerEntryPlus struct {
+		Last        float64 `json:",string"`
+		Ask         float64 `json:"lowestAsk,string"`
+		Bid         float64 `json:"highestBid,string"`
+		change      float64 `json:"percentChange,string"` // not currently exported
+		baseVolume  float64 `json:"baseVolume,string"`    // not currently exported
+		quoteVolume float64 `json:"quoteVolume,string"`   // not currently exported
+		IsFrozen    int64   `json:"isFrozen,string"`
+
+		Ema30     float64 `json:"ema30,string"`
+		Sma50     float64 `json:"sma50,string"`
+		Timestamp int64   `json:"timestamp,string"` // TODO not expoterd!!! Capitalise to export...
+	}
+
+	TickerPlus map[pair]TickerEntryPlus
+
+	TrainingData map[pair][]TickerEntryPlus
+)
+
 func (b *Bot) CollectTickerData() {
 	/////////////////////////////////////
 	// get poloniex data and set up variables from config file
@@ -36,7 +59,7 @@ func (b *Bot) CollectTickerData() {
 	if err != nil {
 		panic(fmt.Errorf("Fatal error marshalling json for ticker data: %s \n", err))
 	}
-	file := "data/" + fmt.Sprintf("%d", time.Now().Unix()) + ".json"
+	file := b.TrainingDataDir + "/" + fmt.Sprintf("%d", time.Now().Unix()) + ".json"
 	err = ioutil.WriteFile(file, j, 0664)
 	if err != nil {
 		panic(fmt.Errorf("Fatal error writing data file: %s \n", err))
@@ -46,118 +69,11 @@ func (b *Bot) CollectTickerData() {
 	}
 }
 
-func (b *Bot) MergeData() {
-	files, err := ioutil.ReadDir("data")
-	if err != nil {
-		if b.Logging {
-			Error.Printf("Fatal error reading data directory: %v (is it created?)", err)
-		}
-		return
-	}
-
-	merged := "{"
-	for _, file := range files {
-		fname := strings.Split(file.Name(), ".")
-		filename := "data/" + file.Name()
-
-		// filter the directory listing...
-		if len(fname) != 2 || fname[1] != "json" || fname[0] == "data" {
-			if b.Logging {
-				Info.Print("skipping " + filename)
-			}
-			continue
-		}
-
-		// read the file data...
-		data, err := ioutil.ReadFile(filename)
-		if err != nil {
-			if b.Logging {
-				Info.Print(fmt.Errorf("Fatal error reading file: (%s) %s ", filename, err))
-			}
-			continue
-		}
-
-		// filter data to remove
-		// ...
-
-		// if b.Logging { Info.Print("merging "+filename) }
-		if len(merged) > 1 {
-			merged += ",\n"
-		}
-		merged += fmt.Sprintf("\"%s\": %s", fname[0], data)
-	}
-	merged += "}" // "}\n"
-	if merged == "{}" {
-		if b.Logging {
-			Info.Print("No data to merge. Not writing data/data.json")
-		}
-		return
-	}
-
-	err = ioutil.WriteFile("data/data.json", []byte(merged), 0664)
-	if err != nil {
-		if b.Logging {
-			Error.Printf("Fatal error writing data file: %s ", err)
-		}
-	}
-	if b.Logging {
-		Info.Println("data.json written ok.")
-	}
-}
-
-//,"XMR_NXT":{"Last":"0.00056971","lowestAsk":"0.00058588","highestBid":"0.00057017","percentChange":"-0.1225241","baseVolume":"34.89409024","quoteVolume":"57047.21168544","isFrozen":"0"}
-//  ,"[A-Z]+_[A-Z]+":\{.+\}
-
-/* TAKE COLLECTED DATA AND TRANSFORM INTO A DIFFERENT ORDERED FORM AND CALCULATE EMA SMA
- * STORE AS JSON TO BE USED FOR DRY RUNS
- */
-
-// timestamp.json: ticker== map of pairs, map of prices --> add ema, sma and timestamp fields to prices [ticker with  extra fields]
-//          transforms to
-// map of pairs: slice of prices sorted by timestamp
-
-type (
-	pair string // "BTC_STR"
-
-	// NOTE: to make a part of the struct not export (it will not import) just change the initial letter to lowercase
-	TickerEntryPlus struct {
-		Last        float64 `json:",string"`
-		Ask         float64 `json:"lowestAsk,string"`
-		Bid         float64 `json:"highestBid,string"`
-		change      float64 `json:"percentChange,string"` // not currently exported
-		baseVolume  float64 `json:"baseVolume,string"`    // not currently exported
-		quoteVolume float64 `json:"quoteVolume,string"`   // not currently exported
-		IsFrozen    int64   `json:"isFrozen,string"`
-
-		Ema30     float64 `json:"ema30,string"`
-		Sma50     float64 `json:"sma50,string"`
-		Timestamp int64   `json:"timestamp,string"` // TODO not expoterd!!! Capitalise to export...
-	}
-
-	TickerPlus map[pair]TickerEntryPlus
-
-	TrainingData map[pair][]TickerEntryPlus
-)
-
 func (b *Bot) PrepareData() {
-	// test to see if data has been collected
-	// init data structures
-	// unmarshall
-	// stuff into new data structure
-	//
-	// for each pair:
-	//  for each timestamp in order
-	//   calc sma
-	//   calc ema
-	//  truncate EMA-SMA of data
-	// save in
-	datadir := "data"
-	trainingdatafile := "trainingdata.json"
-
 	myTrainingData := make(map[pair][]TickerEntryPlus)
 
 	// open data directory
-	files, err := ioutil.ReadDir(datadir)
+	files, err := ioutil.ReadDir(b.TrainingDataDir)
 	if err != nil {
 		if b.Logging {
 			Error.Printf("Fatal error reading data directory: %v (is it created?)", err)
@@ -167,10 +83,11 @@ func (b *Bot) PrepareData() {
 	if len(files) < 100 {
 		panic("Not enough data files. Need at least 100!")
 	}
+
 	// open each file
 	for i, file := range files {
 		fname := strings.Split(file.Name(), ".")
-		filename := datadir + "/" + file.Name()
+		filename := b.TrainingDataDir + "/" + file.Name()
 
 		fmt.Printf("\rReading file %v/%v ", i+1, len(files))
 
@@ -191,10 +108,8 @@ func (b *Bot) PrepareData() {
 			}
 			continue
 		}
-		//fmt.Println(fname,len(data))
 
 		myTickerPlus := make(map[pair]TickerEntryPlus)
-
 		err = json.Unmarshal(data, &myTickerPlus)
 		if err != nil {
 			panic(fmt.Errorf("Fatal error unmarshalling data file: %s \n", err))
@@ -213,7 +128,6 @@ func (b *Bot) PrepareData() {
 		}
 	} // end for each file
 
-	//fmt.Println("Sorting...")
 	// data is currently unsorted. sort on timestamp key here
 	for myPair, _ := range myTrainingData {
 		sort.Slice(myTrainingData[myPair], func(i, j int) bool { return myTrainingData[myPair][i].Timestamp < myTrainingData[myPair][j].Timestamp })
@@ -227,7 +141,7 @@ func (b *Bot) PrepareData() {
 		var sum float64
 		var emamulti float64 = 2.0 / (30.0 + 1)
 
-                datalength := len(myTrainingData[myPair])
+		datalength := len(myTrainingData[myPair])
 		if datalength < 100 {
 			panic("Not enough data loaded to create moving averages")
 		}
@@ -239,6 +153,7 @@ func (b *Bot) PrepareData() {
 		for i := trunc; i < datalength; i++ {
 			myTrainingData[myPair][i].Sma50 = myTrainingData[myPair][i-1].Sma50 + (myTrainingData[myPair][i].Last-myTrainingData[myPair][i-50].Last)/50
 		}
+
 		// ema on data see CalcEMA
 		// get initial sma10
 		var ema float64
@@ -270,7 +185,7 @@ func (b *Bot) PrepareData() {
 	if err != nil {
 		panic(fmt.Errorf("Fatal error marshalling json for training data: %s \n", err))
 	}
-	file := datadir + "/" + trainingdatafile //"data/trainingdata.json"
+	file := b.TrainingDataDir + "/" + b.TrainingDataFile //"data/trainingdata.json"
 	err = ioutil.WriteFile(file, j, 0664)
 	if err != nil {
 		panic(fmt.Errorf("Fatal error writing data file: %s \n", err))
@@ -278,22 +193,34 @@ func (b *Bot) PrepareData() {
 	if b.Logging {
 		Info.Println(file + " written ok.")
 	}
-
 }
 
-
 func loadPreparedData() *TrainingData {
-    // check it exists
-    myTrainingData := make(TrainingData)
-//     myTrainingData := make(map[pair][]TickerEntryPlus)
-    // load and unmarshall
-    // sort
-    
-    // return
+	// check it exists
+	myTrainingData := make(TrainingData)
+	//     myTrainingData := make(map[pair][]TickerEntryPlus)
+	// load and unmarshall
+	// sort
+
+	// return
 	return &myTrainingData
 }
 
-// move to own file...
-func (b *Bot) Train()  {
+// move to own file... ???
+func (b *Bot) Train() {
+	//myTrainingData:=loadPreparedData()
+	// open a csv file for dumping data
+	// calc permutations
+	// loop: over traing date using different analysis routines
+	//  set random seed to 1
+	//  vary the state parameters
+	//  loop: new state.
+	//      sum permutations and display for impatient analysers
+	//      prepare analyse
+	//      call analyse
+	//      do buy and sell
+	//  stuff into CSV the profit, buys and sells for parameters varied and analysis chosen
+	// finish and rest!
+	// TODO use go routines to speed things on? Depends how slow!
 
 }

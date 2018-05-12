@@ -34,37 +34,32 @@ type coinstate struct {
 }
 
 var (
-	Info     *log.Logger
-	Warning  *log.Logger
-	Error    *log.Logger
-//	conf     *viper.Viper
-//	exchange *poloniex.Poloniex
-//	state    map[string]*coinstate
-//	BotName  = "HastyPoloniexBot"
-//	ticker   poloniex.Ticker
-//	Logging  bool = false // initial state of logging
-
-//         state *viper.Viper
-
+	Info    *log.Logger
+	Warning *log.Logger
+	Error   *log.Logger
 )
 
 type Bot struct {
-    Conf     *viper.Viper
-	Exchange *poloniex.Poloniex
-	State    map[string]*coinstate
-	Ticker   poloniex.Ticker
-	BotName  string
-	Version  string
-	Logging  bool 
+	Conf             *viper.Viper
+	Exchange         *poloniex.Poloniex
+	State            map[string]*coinstate
+	Ticker           poloniex.Ticker
+	BotName          string
+	Version          string
+	Logging          bool
+	TrainingDataFile string
+	TrainingDataDir  string
 }
 
-func NewBot() *Bot  {
-    b:=Bot{
-        BotName: BOTNAME, 
-        Version: VERSION,
-        Logging: false,             // initial state of logging
-    }
-    return &b
+func NewBot() *Bot {
+	b := Bot{
+		BotName:          BOTNAME,
+		Version:          VERSION,
+		Logging:          false, // initial state of logging
+		TrainingDataDir:  "data",
+		TrainingDataFile: "trainingdata.json",
+	}
+	return &b
 }
 
 type coinaction struct {
@@ -82,10 +77,16 @@ const (
 )
 
 func (a action) String() string {
-    if a==NOACTION { return "NoAction" }
-    if a==BUY { return "Buy" }
-    if a==SELL { return "Sell" }
-    return "Err unknown"
+	if a == NOACTION {
+		return "NoAction"
+	}
+	if a == BUY {
+		return "Buy"
+	}
+	if a == SELL {
+		return "Sell"
+	}
+	return "Err unknown"
 }
 
 const (
@@ -98,7 +99,7 @@ const (
 func (b *Bot) ConfInit(config string) {
 	b.Conf = viper.New()
 
-    // set defaults here
+	// set defaults here
 	b.Conf.SetConfigType("toml")
 	b.Conf.AddConfigPath(".")
 	b.Conf.SetConfigName(config) // name of config file (without extension)
@@ -107,23 +108,18 @@ func (b *Bot) ConfInit(config string) {
 	b.Conf.SetDefault("TradingRules.CoolOffDuration", "2h")
 	//
 	err := b.Conf.ReadInConfig() // Find and read the config file
-	if err != nil {            // Handle errors reading the config file
+	if err != nil {              // Handle errors reading the config file
 		panic(fmt.Errorf("Fatal error reading config file: %s \n", err))
 	}
 }
 
 // STATE
 func (b *Bot) StateInit() {
-	b.State = make(map[string]*coinstate)
-	
-    statefile := b.Conf.GetString("DataStore.filename")
+	b.NewState()
+
+	statefile := b.Conf.GetString("DataStore.filename")
 
 	if _, err := os.Stat(statefile); os.IsNotExist(err) {
-		// defaults
-		b.State[b.Conf.GetString("Currency.Base")] = &coinstate{Balance: 0.1, Coin: "BTC"}
-		b.State[b.Conf.GetString("Currency.Target")] = &coinstate{}
-		b.State[LAST] = &coinstate{Coin: "BTC"}
-		b.State[TOTAL] = &coinstate{Coin: "BTC"}
 		b.StoreState()
 	} else {
 		// load and unmarshal state file
@@ -139,6 +135,15 @@ func (b *Bot) StateInit() {
 			panic(fmt.Errorf("Fatal error unmarshalling state file: %s \n", err))
 		}
 	}
+}
+
+func (b *Bot) NewState() {
+	b.State = make(map[string]*coinstate)
+	// defaults
+	b.State[b.Conf.GetString("Currency.Base")] = &coinstate{Balance: 0.1, Coin: "BTC"}
+	b.State[b.Conf.GetString("Currency.Target")] = &coinstate{}
+	b.State[LAST] = &coinstate{Coin: "BTC"}
+	b.State[TOTAL] = &coinstate{Coin: "BTC"}
 }
 
 func (b *Bot) StoreState() {
@@ -163,82 +168,86 @@ func init() {
 func main() {
 	var config string
 	var collectdata bool
-	var mergedata bool
 	var preparedata bool
 	var trainmode bool
-    
+
 	flag.StringVar(&config, "config", "config", "config file to use")
 	flag.BoolVar(&collectdata, "collectdata", false, "collect ticker data and save to data folder as [unixtime].json")
-	flag.BoolVar(&mergedata, "mergedata", false, "Merge all collected ticker data and save to data folder as data.json")
 	flag.BoolVar(&preparedata, "preparedata", false, "Prepare collected ticker data for trianing runs")
 	flag.BoolVar(&trainmode, "train", false, "Start a training run")
 	flag.Parse()
 
-	var bot = NewBot()
+	// make Bot object
+	var b = NewBot()
 	// load config file
-	bot.ConfInit(config)
+	b.ConfInit(config)
 
 	// config state
-	bot.StateInit()
-	defer bot.StoreState() // make sure state info is saved when program terminates
+	b.StateInit()
+	defer b.StoreState() // make sure state info is saved when program terminates
 
 	// initialise logging
-	bot.Logging = true
-	bot.BotName = bot.Conf.GetString("BotControl.botname")
-	LogInit(bot.BotName + ".log")
-	if bot.Logging {
-		Info.Println("STARTING HastyPoloniexBot VERSION " + bot.Version + " Bot name:" + bot.BotName)
+	b.Logging = true
+	b.BotName = b.Conf.GetString("BotControl.botname")
+	LogInit(b.BotName + ".log")
+	if b.Logging {
+		Info.Println("STARTING HastyPoloniexBot VERSION " + b.Version + " Bot name:" + b.BotName)
 	}
 
-	// Special runing modes
+	// Special data collection/training modes
+
+	// collect data: get ticker data to build training data from
 	if collectdata {
-		if bot.Logging {
+		if b.Logging {
 			Info.Println("Collecting ticker data")
 		}
-		bot.CollectTickerData()
+		b.CollectTickerData()
 		return // end program
 	}
-	if mergedata {
-		if bot.Logging {
-			Info.Println("Merging ticker data")
-		}
-		bot.MergeData()
-		return // end program
-	}
+
+	// preparedata: combine ticker date collected by collectdata with some processing and filtering
 	if preparedata {
-		if bot.Logging {
+		if b.Logging {
 			Info.Println("Preparing ticker data")
 		}
-		bot.PrepareData()
+		b.PrepareData()
 		return // end program
 	}
+
+	// trainmode: fine tune params and analysis strategies using training data
 	if trainmode {
-		if bot.Logging {
+		if b.Logging {
 			Info.Println("Entering training mode")
 		}
-		bot.Train()
+		b.Train()
 		return // end program
 	}
-	if bot.Conf.GetBool("BotControl.Active") == false {
-		if bot.Logging {
+
+	// Trading modes
+
+	// Bot config says Bot should not be active
+	if b.Conf.GetBool("BotControl.Active") == false {
+		if b.Logging {
 			Info.Println("Active is FALSE - Quiting")
 		}
 		return // end program
 	}
 
-	// Modes of operation
-	if bot.Conf.GetBool("BotControl.Simulate") {
-		if bot.Logging {
+	// Simulate mode is set to on/true
+	if b.Conf.GetBool("BotControl.Simulate") {
+		if b.Logging {
 			Info.Println("Simulate Mode is ON")
 		}
 	}
-	if bot.Conf.GetBool("BotControl.SellSellSell") {
-		if bot.Logging {
+
+	// Crash sell is on/true
+	if b.Conf.GetBool("BotControl.SellSellSell") {
+		if b.Logging {
 			Info.Println("SellSellSell detected - attemping to sell all held assets")
 		}
 	}
 
-	// all setup is done
-	bot.Trade()
+	// Setup is done
+	b.Trade()
 
 }

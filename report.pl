@@ -4,7 +4,8 @@ use Modern::Perl;
 
 # get args from commandline
 no warnings;
-#die "I require one or more state.json files to report well!" if $#ARGV==0;
+# say $#ARGV;
+die "I require one or more state.json files to report well!" if $#ARGV==-1;
 say '<html><head><meta http-equiv="refresh" content="30"></head><body><h1>Hastypoloniexbot Report</h1><pre>';
 
 for my $i  (0..$#ARGV) {

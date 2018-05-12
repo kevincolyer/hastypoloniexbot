@@ -2,12 +2,12 @@ package main
 
 import "time"
 
-// global throttle to limit api calls to 6 per second
+// global throttle to limit api calls to 6 per second.
+// Call before each private API call (not public)
 
 type tick struct{}
 
-var throttlerchan chan tick 
-
+var throttlerchan chan tick
 
 func throttler(t chan tick) {
 	for true {

@@ -22,15 +22,15 @@ func (b *Bot) Trade() {
 
 	// Get Ticker
 	// {Last, Ask, Bid,Change,BaseVolume,QuoteVolume,IsFrozen}
-    var err error
-	b.Ticker,err = b.Exchange.Ticker()
+	var err error
+	b.Ticker, err = b.Exchange.Ticker()
 	if err != nil {
 		if b.Logging {
 			Error.Printf("Fatal error getting ticker data from poloniex: %v", err)
 		}
 		return
 	}
-//     b.Ticker=ticker
+	//     b.Ticker=ticker
 	// set up some variables from config
 	fiat := b.Conf.GetString("Currency.Fiat")
 	FIATBTC := b.Ticker[fiat+"_BTC"].Last // can be other curency than usdt
@@ -203,7 +203,7 @@ func getTimeNow() (now time.Time) {
 
 // buying and selling for each coin
 // using analysis to place our orders
-func (b *Bot)  PlaceBuyAndSellOrders(base string, fragmenttotal float64, todo []coinaction) {
+func (b *Bot) PlaceBuyAndSellOrders(base string, fragmenttotal float64, todo []coinaction) {
 	///////////////////////////////////////////
 	if b.Logging {
 		Info.Println("PLACING ORDERS")

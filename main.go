@@ -40,24 +40,26 @@ var (
 )
 
 type Bot struct {
-	Conf             *viper.Viper
-	Exchange         *poloniex.Poloniex
-	State            map[string]*coinstate
-	Ticker           poloniex.Ticker
-	BotName          string
-	Version          string
-	Logging          bool
-	TrainingDataFile string
-	TrainingDataDir  string
+	Conf              *viper.Viper
+	Exchange          *poloniex.Poloniex
+	State             map[string]*coinstate
+	Ticker            poloniex.Ticker
+	BotName           string
+	Version           string
+	Logging           bool
+	TrainingDataFile  string
+	TrainingDataDir   string
+	TrainingOutputDir string
 }
 
 func NewBot() *Bot {
 	b := Bot{
-		BotName:          BOTNAME,
-		Version:          VERSION,
-		Logging:          false, // initial state of logging
-		TrainingDataDir:  "data",
-		TrainingDataFile: "trainingdata.json",
+		BotName:           BOTNAME,
+		Version:           VERSION,
+		Logging:           false, // initial state of logging
+		TrainingDataDir:   "data",
+		TrainingDataFile:  "trainingdata.json",
+		TrainingOutputDir: "training",
 	}
 	return &b
 }

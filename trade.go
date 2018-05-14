@@ -115,7 +115,7 @@ func (b *Bot) Trade() {
 	b.LogInfof("%v %v (%v %v) ", base, fc(basebalance), fc(basebalance*FIATBTC), fiat)
 	for _, coin = range targets {
 		if b.State[coin].Balance > 0 {
-			Info.Printf("%v %v (%v %v) ", coin, fc(b.State[coin].Balance), fc(b.State[coin].FiatValue), fiat)
+			b.LogInfof("%v %v (%v %v) ", coin, fc(b.State[coin].Balance), fc(b.State[coin].FiatValue), fiat)
 		}
 	}
 	b.LogInfof("BALANCE Total %v %v over %v coins", fc(basetotal), base, fragmenttotal)

@@ -41,15 +41,11 @@ func (b *Bot) Analyse(coin string) (advice action, ranking float64) {
 	advice = NOACTION
 	pair := b.Conf.GetString("Currency.Base") + "_" + coin
 	period := b.Conf.GetInt("Analysis.period")
-	if b.Logging {
-		Info.Printf(coin+" Analysis using ema and sma for period of %v\n", period)
-	}
+	b.LogInfof(coin+" Analysis using ema and sma for period of %v\n", period)
 	// get chartdata from polo for coin
 	data, err := b.Exchange.ChartDataPeriod(pair, period)
 	if err != nil {
-		if b.Logging {
-			Warning.Printf("Could not retrieve data for pair %s. Error %v\n", pair, err)
-		}
+		b.LogWarningf("Could not retrieve data for pair %s. Error %v\n", pair, err)
 		return
 	}
 	closings := mungeCoinChartData(data)
@@ -72,9 +68,7 @@ func (b *Bot) Analyse(coin string) (advice action, ranking float64) {
 	d.cooloffduration, _ = time.ParseDuration(b.Conf.GetString("TradingRules.CoolOffDuration"))
 	// 	if err != nil {
 	// 		dur, _ = time.ParseDuration("2h")
-	// 		if b.Logging {
-	// 			Warning.Printf("Couldn't parse CoolOffDuration (%v). Setting default to %v\n", b.Conf.GetString("TradingRules.CoolOffDuration"), dur)
-	// 		}
+	// 			b.LogWarningf("Couldn't parse CoolOffDuration (%v). Setting default to %v\n", b.Conf.GetString("TradingRules.CoolOffDuration"), dur)
 	// 	}
 	if d.coinbalance == 0 && d.lastsold.After(time.Now().Add(-d.cooloffduration)) {
 		d.cooloffperiod = true
@@ -125,56 +119,43 @@ func (b *Bot) AnalyseChartData(d analysisdata) (advice action, ranking float64) 
 	anal := d.coin + " "
 	trendingdown := pdiff(d.ema, d.sma) < pdiff(d.lastema, d.lastsma)
 
-	if b.Logging {
-		if trendingdown {
-			Info.Printf(anal+"ema diff %v is trending down from last diff %v\n", fc(pdiff(d.ema, d.sma)), fc(pdiff(d.lastema, d.lastsma)))
-		} else {
-			Info.Printf(anal+"ema diff %v is trending up from last diff %v\n", fc(pdiff(d.ema, d.sma)), fc(pdiff(d.lastema, d.lastsma)))
-		}
+	if trendingdown {
+		b.LogInfof(anal+"ema diff %v is trending down from last diff %v\n", fc(pdiff(d.ema, d.sma)), fc(pdiff(d.lastema, d.lastsma)))
+	} else {
+		b.LogInfof(anal+"ema diff %v is trending up from last diff %v\n", fc(pdiff(d.ema, d.sma)), fc(pdiff(d.lastema, d.lastsma)))
 	}
 
-	if b.Logging {
-		if d.coinbalance > 0 {
-			Info.Printf(anal+"Currently holding %v\n", fc(d.coinbalance))
-		} else {
-			Info.Printf(anal + "Currently not holding coin\n")
-		}
-		direction := d.coin
-		if diff >= 0 {
-			direction += " ema/sma +ve"
-		} else {
-			direction += " ema/sma -ve"
-		}
-		Info.Printf(anal+"%v: sma(%v): %v ema(%v): %v diff: %v\n", direction, d.smaperiods, fc(d.sma), d.emaperiods, fc(d.ema), fc(diff))
+	if d.coinbalance > 0 {
+		b.LogInfof(anal+"Currently holding %v\n", fc(d.coinbalance))
+	} else {
+		b.LogInfo(anal + "Currently not holding coin")
 	}
+	direction := d.coin
+	if diff >= 0 {
+		direction += " ema/sma +ve"
+	} else {
+		direction += " ema/sma -ve"
+	}
+	b.LogInfof(anal+"%v: sma(%v): %v ema(%v): %v diff: %v\n", direction, d.smaperiods, fc(d.sma), d.emaperiods, fc(d.ema), fc(diff))
 
 	if d.coinbalance == 0 {
 		// if last coin sold is this coin then do nothing (cooling off period)
 		if d.cooloffperiod {
-			if b.Logging {
-				Info.Printf(anal+" in cooling off period. Not Buying.\n", d.lastcoin)
-			}
+			b.LogInfo(anal + " in cooling off period. Not Buying " + d.lastcoin)
 			return
 		}
 		// if ema<sma advice nothing return
 		if d.ema < d.sma {
-			if b.Logging {
-				Info.Printf(anal + "ema is less than sma - coin trending down not a good buy\n")
-			}
+			b.LogInfof(anal + "ema is less than sma - coin trending down not a good buy\n")
 			return
 		}
 		ranking = diff / d.sma
 		if d.ema > d.sma && ranking < d.triggerbuy {
-			if b.Logging {
-				Info.Printf(anal+"ema greater than sma but not by triggerbuy limit:%v %% (%v %%)\n", fp2(ranking), fp2(d.triggerbuy))
-			}
+			b.LogInfof(anal+"ema greater than sma but not by triggerbuy limit:%v %% (%v %%)\n", fp2(ranking), fp2(d.triggerbuy))
 			return
-
 		}
 		// ema>sma by triggerbuy...
-		if b.Logging {
-			Info.Printf(anal+"Recommend BUY ranking %v above triggerbuy %v\n", fp2(ranking), fp2(d.triggerbuy))
-		}
+		b.LogInfof(anal+"Recommend BUY ranking %v above triggerbuy %v\n", fp2(ranking), fp2(d.triggerbuy))
 		advice = BUY // only recommended as  coinbalance ==0
 		return
 	}
@@ -185,9 +166,7 @@ func (b *Bot) AnalyseChartData(d analysisdata) (advice action, ranking float64) 
 		percentloss = 0
 	}
 	// sell if trending down (buy back should be delayed a few hours)
-	if b.Logging {
-		Info.Printf(anal+"PurchasePrice %v currentprice %v percentloss %v %v purchasedate %v lastsale %v \n", fc(d.purchaseprice), fc(d.currentprice), fn(percentloss), fn(pl), d.purchasedate, d.lastsold)
-	}
+	b.LogInfof(anal+"PurchasePrice %v currentprice %v percentloss %v %v purchasedate %v lastsale %v \n", fc(d.purchaseprice), fc(d.currentprice), fn(percentloss), fn(pl), d.purchasedate, d.lastsold)
 
 	// 	if coinbalance > 0 && percentloss < 0 {
 	//
@@ -207,9 +186,7 @@ func (b *Bot) AnalyseChartData(d analysisdata) (advice action, ranking float64) 
 	// ma diff is lower than triggersell
 	if d.coinbalance > 0 && diff/d.sma < d.triggersell {
 		advice = SELL
-		if b.Logging {
-			Info.Printf(anal+"Recommend SELL as ema-sma/sma %v is less than triggersell %v\n", fp(diff/d.sma), fp(d.triggersell))
-		}
+		b.LogInfof(anal+"Recommend SELL as ema-sma/sma %v is less than triggersell %v\n", fp(diff/d.sma), fp(d.triggersell))
 		return
 	}
 	if d.coinbalance > 0 && d.ema < d.sma {
@@ -218,16 +195,12 @@ func (b *Bot) AnalyseChartData(d analysisdata) (advice action, ranking float64) 
 		// curent price < purchase price-allowable loss the advice = sell
 		if percentloss < 0 && -percentloss > d.maxlosstorisk {
 			advice = SELL
-			if b.Logging {
-				Info.Printf(anal+"Recommend SELL as loss %v %% is less than maxlosstorisk %v %%\n", fp2(percentloss), fp2(d.maxlosstorisk))
-			}
+			b.LogInfof(anal+"Recommend SELL as loss %v %% is less than maxlosstorisk %v %%\n", fp2(percentloss), fp2(d.maxlosstorisk))
 			return
 		}
 		// current price > purchase price info - keep - coin is growing in value
 		if percentloss == 0 {
-			if b.Logging {
-				Warning.Printf(anal + "Coin is in profit and growing in value but trending down")
-			}
+			b.LogWarning(anal + "Coin is in profit and growing in value but trending down")
 			return
 		}
 		// current price > purchase price + max allowed growth - sell (get out on top)
@@ -235,22 +208,16 @@ func (b *Bot) AnalyseChartData(d analysisdata) (advice action, ranking float64) 
 	}
 	growth := (d.currentprice - d.purchaseprice) / d.purchaseprice
 	if d.coinbalance > 0 && growth > d.maxgrowth {
-		if b.Logging {
-			Info.Printf(anal+"SELL:  %v times greater than purchase price - triggered maxgrowth %v\n", fn(growth), fn(d.maxgrowth))
-		}
+		b.LogInfof(anal+"SELL:  %v times greater than purchase price - triggered maxgrowth %v\n", fn(growth), fn(d.maxgrowth))
 		advice = SELL
 		return
 	}
 	if d.coinbalance > 0 && d.HeldForLongEnough {
-		if b.Logging {
-			Info.Printf(anal + "SELL: Held for long enough threshold exceeded.\n")
-		}
+		b.LogInfof(anal + "SELL: Held for long enough threshold exceeded.\n")
 		advice = SELL
 		return
 	}
-	if b.Logging {
-		Info.Print(anal + "Nothing to do. No concerns")
-	}
+	b.LogInfo(anal + "Nothing to do. No concerns")
 	return
 }
 

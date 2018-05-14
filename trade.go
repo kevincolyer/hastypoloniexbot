@@ -11,34 +11,28 @@ import (
 
 func (b *Bot) Trade() {
 	/////////////////////////////////////
-	// get poloniex data and set up variables from config file
-	if b.Logging {
-		Info.Println("GETTING POLONIEX DATA")
-	}
+	// Get poloniex data and set up variables from config file
+	b.LogInfo("GETTING POLONIEX DATA")
 
 	b.Exchange = poloniex.NewKS(
 		b.Conf.GetString("Credentials.apikey"),
 		b.Conf.GetString("Credentials.secret")) // check for failure needed here?
 
-	// Get Ticker
-	// {Last, Ask, Bid,Change,BaseVolume,QuoteVolume,IsFrozen}
+	// Get Ticker {Last, Ask, Bid,Change,BaseVolume,QuoteVolume,IsFrozen}
 	var err error
 	b.Ticker, err = b.Exchange.Ticker()
 	if err != nil {
-		if b.Logging {
-			Error.Printf("Fatal error getting ticker data from poloniex: %v", err)
-		}
+		b.LogErrorf("Fatal error getting ticker data from poloniex: %v", err)
 		return
 	}
-	//     b.Ticker=ticker
-	// set up some variables from config
+	// Set up some variables from config
 	fiat := b.Conf.GetString("Currency.Fiat")
 	FIATBTC := b.Ticker[fiat+"_BTC"].Last // can be other curency than usdt
 	base := b.Conf.GetString("Currency.Base")
 	sss := b.Conf.GetBool("BotControl.SellSellSell")
 	simulate := b.Conf.GetBool("BotControl.Simulate")
 
-	// get list of coins we are targetting
+	// Get list of coins we are targetting
 	targets := b.GetTargettedCoins()
 	sort.Strings(targets)
 
@@ -52,13 +46,9 @@ func (b *Bot) Trade() {
 	// start off by getting all our open orders (that have not been fullfilled for whatever reason) and cancel them
 	//
 	if simulate == false {
-		if b.Logging {
-			Info.Println("CANCELLING ALL OPEN ORDERS")
-		}
+		b.LogInfo("CANCELLING ALL OPEN ORDERS")
 		if ok := b.CancelAllOpenOrders(base, targets); !ok {
-			if b.Logging {
-				Error.Println("Problem cancelling all open orders: bailing out.")
-			}
+			b.LogError("Problem cancelling all open orders: bailing out.")
 			return
 		}
 	}
@@ -72,9 +62,7 @@ func (b *Bot) Trade() {
 	if simulate == false {
 		balances, err = b.Exchange.AvailableAccountBalances() // kpc added this function
 		if err != nil {
-			if b.Logging {
-				Error.Printf("Failed to get coin AccountBalances from poloniex: %v", err)
-			}
+			b.LogErrorf("Failed to get coin AccountBalances from poloniex: %v", err)
 		}
 		b.State[base].Balance = balances.Exchange[base]
 		// + balances[base].OnOrders // include open buy orders - they will get cancelled below. Posssible race condition here!
@@ -122,25 +110,21 @@ func (b *Bot) Trade() {
 		b.State[START] = &coinstate{Coin: base, Balance: basebalance, Date: getTimeNow(), FiatValue: b.State[base].FiatValue}
 	}
 
-	if b.Logging {
-		// print current balances to log
-		Info.Print("BALANCES (PROVISIONAL - ORDERS PENDING/CANCELLING)")
-		Info.Printf("%v %v (%v %v) ", base, fc(basebalance), fc(basebalance*FIATBTC), fiat)
-		for _, coin = range targets {
-			if b.State[coin].Balance > 0 {
-				Info.Printf("%v %v (%v %v) ", coin, fc(b.State[coin].Balance), fc(b.State[coin].FiatValue), fiat)
-			}
+	// print current balances to log
+	b.LogInfo("BALANCES (PROVISIONAL - ORDERS PENDING/CANCELLING)")
+	b.LogInfof("%v %v (%v %v) ", base, fc(basebalance), fc(basebalance*FIATBTC), fiat)
+	for _, coin = range targets {
+		if b.State[coin].Balance > 0 {
+			Info.Printf("%v %v (%v %v) ", coin, fc(b.State[coin].Balance), fc(b.State[coin].FiatValue), fiat)
 		}
-		Info.Printf("BALANCE Total %v %v over %v coins", fc(basetotal), base, fragmenttotal)
 	}
+	b.LogInfof("BALANCE Total %v %v over %v coins", fc(basetotal), base, fragmenttotal)
 
 	////////////////////////////////////////////
 	// Analyse coins
 	// for each coin get Analyse() to evaluate buy/sell and give a ranking of how strongly it is growing so we can prioritise
 	if sss == false {
-		if b.Logging {
-			Info.Println("ANALYSING DATA")
-		}
+		b.LogInfo("ANALYSING DATA")
 
 		for i, _ := range todo {
 			action, ranking := b.Analyse(todo[i].Coin)
@@ -159,9 +143,7 @@ func (b *Bot) Trade() {
 	// Update state before saving
 	// TODO Pause here and perhaps await an update?
 
-	if b.Logging {
-		Info.Print("UPDATING STATS")
-	}
+	b.LogInfo("UPDATING STATS")
 	basetotal = b.State[base].Balance
 	b.State[base].FiatValue = basetotal * FIATBTC
 	b.State[base].BaseValue = basetotal
@@ -197,17 +179,11 @@ func (b *Bot) GetTargettedCoins() (targets []string) {
 	return
 }
 
-func getTimeNow() (now time.Time) {
-	return time.Now()
-}
-
 // buying and selling for each coin
 // using analysis to place our orders
 func (b *Bot) PlaceBuyAndSellOrders(base string, fragmenttotal float64, todo []coinaction) {
 	///////////////////////////////////////////
-	if b.Logging {
-		Info.Println("PLACING ORDERS")
-	}
+	b.LogInfo("PLACING ORDERS")
 	minbasetotrade := b.Conf.GetFloat64("TradingRules.minbasetotrade")
 	maxfragments := b.Conf.GetFloat64("TradingRules.fragments")
 	sales := 0
@@ -224,9 +200,7 @@ func (b *Bot) PlaceBuyAndSellOrders(base string, fragmenttotal float64, todo []c
 			// get current asking price
 			if basebalance > minbasetotrade {
 				Throttle()
-				if b.Logging {
-					Info.Println(coin + " Placing BUY  order")
-				}
+				b.LogInfo(coin + " Placing BUY  order")
 				// TODO need to figure out fragments better - especially if an order does not sell or buy!!!
 				if fragmenttotal < maxfragments && basebalance > minbasetotrade*2 {
 					fragmenttotal++
@@ -235,9 +209,7 @@ func (b *Bot) PlaceBuyAndSellOrders(base string, fragmenttotal float64, todo []c
 				b.Buy(base, coin, b.Ticker[base+"_"+coin].Ask, basebalance)
 
 			} else {
-				if b.Logging {
-					Info.Printf(coin+" buy: balance of %v is lower (%v) than minbasetotrade rule (%v) Can't place buy order", base, fc(basebalance), fc(minbasetotrade))
-				}
+				b.LogInfof(coin+" buy: Can't place buy order - balance of %v is lower (%v) than minbasetotrade rule (%v)", base, fc(basebalance), fc(minbasetotrade))
 			}
 		}
 
@@ -245,18 +217,20 @@ func (b *Bot) PlaceBuyAndSellOrders(base string, fragmenttotal float64, todo []c
 			// get current bidding price
 			// get balance and sell all
 			Throttle()
-			if b.Logging {
-				Info.Println(coin + " Placing SELL order")
-			}
+			b.LogInfo(coin + " Placing SELL order")
 			b.Sell(base, coin, b.Ticker[base+"_"+coin].Bid, coinbalance)
 			sales++
 		}
 
 		if action == NOACTION {
-
-			if b.Logging {
-				Info.Print(coin + " Nothing to do")
-			}
+			b.LogInfo(coin + " Nothing to do")
 		}
 	}
+}
+
+func getTimeNow() time.Time {
+	return time.Now()
+}
+func getTimeNowString() (now string) {
+	return time.Now().Format("2006/01/02 15:04:05")
 }

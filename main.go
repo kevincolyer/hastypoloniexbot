@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"github.com/spf13/viper"
-	//	"io"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -33,17 +32,18 @@ type coinstate struct {
 	Misc           string
 }
 
-var (
-	Info    *log.Logger
-	Warning *log.Logger
-	Error   *log.Logger
-)
+// var (
+// 	Info    *log.Logger
+// 	Warning *log.Logger
+// 	Error   *log.Logger
+// )
 
 type Bot struct {
 	Conf              *viper.Viper
 	Exchange          *poloniex.Poloniex
 	State             map[string]*coinstate
 	Ticker            poloniex.Ticker
+	BotLog            *log.Logger
 	BotName           string
 	Version           string
 	Logging           bool
@@ -191,36 +191,29 @@ func main() {
 	// initialise logging
 	b.Logging = true
 	b.BotName = b.Conf.GetString("BotControl.botname")
-	LogInit(b.BotName + ".log")
-	if b.Logging {
-		Info.Println("STARTING HastyPoloniexBot VERSION " + b.Version + " Bot name:" + b.BotName)
-	}
-
+	b.LogInit(b.BotName + ".log")
+	b.LogInfo(getTimeNowString() + " STARTING HastyPoloniexBot VERSION " + b.Version + " Bot name:" + b.BotName)
+	defer b.LogInfo(getTimeNowString() + " FINISHED")
 	// Special data collection/training modes
 
 	// collect data: get ticker data to build training data from
 	if collectdata {
-		if b.Logging {
-			Info.Println("Collecting ticker data")
-		}
+		b.LogInfo("Collecting ticker data")
 		b.CollectTickerData()
 		return // end program
 	}
 
 	// preparedata: combine ticker date collected by collectdata with some processing and filtering
 	if preparedata {
-		if b.Logging {
-			Info.Println("Preparing ticker data")
-		}
+		b.LogInfo("Preparing ticker data")
 		b.PrepareData()
 		return // end program
 	}
 
 	// trainmode: fine tune params and analysis strategies using training data
 	if trainmode {
-		if b.Logging {
-			Info.Println("Entering training mode")
-		}
+
+		b.LogInfo("Entering training mode")
 		b.Train()
 		return // end program
 	}
@@ -229,27 +222,20 @@ func main() {
 
 	// Bot config says Bot should not be active
 	if b.Conf.GetBool("BotControl.Active") == false {
-		if b.Logging {
-			Info.Println("Active is FALSE - Quiting")
-		}
+		b.LogInfo("Active is FALSE - Quiting")
 		return // end program
 	}
 
 	// Simulate mode is set to on/true
 	if b.Conf.GetBool("BotControl.Simulate") {
-		if b.Logging {
-			Info.Println("Simulate Mode is ON")
-		}
+		b.LogInfo("Simulate Mode is ON")
 	}
 
 	// Crash sell is on/true
 	if b.Conf.GetBool("BotControl.SellSellSell") {
-		if b.Logging {
-			Info.Println("SellSellSell detected - attemping to sell all held assets")
-		}
+		b.LogInfo("SellSellSell detected - attemping to sell all held assets")
 	}
 
 	// Setup is done
 	b.Trade()
-
 }

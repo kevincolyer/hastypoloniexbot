@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"sort"
 	"strconv"
@@ -50,9 +51,7 @@ func (b *Bot) CollectTickerData() {
 	// {Last, Ask, Bid,Change,BaseVolume,QuoteVolume,IsFrozen}
 	ticker, err := b.Exchange.Ticker()
 	if err != nil {
-		if b.Logging {
-			Error.Printf("Fatal error getting ticker data from poloniex: %v", err)
-		}
+		b.LogErrorf("Fatal error getting ticker data from poloniex: %v", err)
 		return
 	}
 
@@ -66,9 +65,7 @@ func (b *Bot) CollectTickerData() {
 	if err != nil {
 		panic(fmt.Errorf("Fatal error writing data file: %s \n", err))
 	}
-	if b.Logging {
-		Info.Println(file + " written ok.")
-	}
+	b.LogInfo(file + " written ok.")
 }
 
 func (b *Bot) PrepareData() {
@@ -77,9 +74,7 @@ func (b *Bot) PrepareData() {
 	// open data directory
 	files, err := ioutil.ReadDir(b.TrainingDataDir)
 	if err != nil {
-		if b.Logging {
-			Error.Printf("Fatal error reading data directory: %v (is it created?)", err)
-		}
+		b.LogErrorf("Fatal error reading data directory: %v (is it created?)", err)
 		return
 	}
 	if len(files) < 100 {
@@ -96,18 +91,14 @@ func (b *Bot) PrepareData() {
 		// filter the directory listing...
 		timestamp, err := strconv.Atoi(fname[0])
 		if len(fname) != 2 || fname[1] != "json" || err != nil {
-			if b.Logging {
-				Info.Print("skipping " + filename)
-			}
+			b.LogInfo("skipping " + filename)
 			continue
 		}
 
 		// read the file data...
 		data, err := ioutil.ReadFile(filename)
 		if err != nil {
-			if b.Logging {
-				Info.Print(fmt.Errorf("Fatal error reading file: (%s) %s ", filename, err))
-			}
+			b.LogInfof("Fatal error reading file: (%s) %s ", filename, err)
 			continue
 		}
 
@@ -192,9 +183,7 @@ func (b *Bot) PrepareData() {
 	if err != nil {
 		panic(fmt.Errorf("Fatal error writing data file: %s \n", err))
 	}
-	if b.Logging {
-		Info.Println(file + " written ok.")
-	}
+	b.LogInfo(file + " written ok.")
 }
 
 func (b *Bot) loadPreparedData() *TrainingData {
@@ -225,15 +214,14 @@ func (b *Bot) loadPreparedData() *TrainingData {
 // move to own file... ???
 func (b *Bot) Train() {
 
+	b.LogInfo("Loading training data")
 	myTrainingData := b.loadPreparedData()
 
 	// open a csv file for dumping data
 	// open data directory
 	_, err := ioutil.ReadDir(b.TrainingDataDir)
 	if err != nil {
-		if b.Logging {
-			Error.Printf("Fatal error reading data directory: %v (is it created?)", err)
-		}
+		b.LogErrorf("Fatal error reading data directory: %v (is it created?)", err)
 		return
 	}
 
@@ -249,6 +237,7 @@ func (b *Bot) Train() {
 		{"header0", "header1", "header2"},
 	}
 
+	// ------------------------------------------------------------
 	// main loop
 	fmt.Println(len((*myTrainingData)))
 	// calc permutations
@@ -256,8 +245,10 @@ func (b *Bot) Train() {
 	//  vary the state parameters
 	//  loop: new state.
 	b.NewState()
-	//      set random seed
+	b.Logging = false
+	b.LogInfo("You wont see this!")
 	rand.Seed(1970) // a good year
+	//     loop: coins (all or range?)
 	//      sum permutations and display for impatient analysers
 	//      prepare analyse
 	//      call analyse
@@ -268,9 +259,10 @@ func (b *Bot) Train() {
 	// TODO use go routines to speed things on? Depends how slow!
 
 	// complete CSV
+	b.Logging = true
+	b.LogInfo("Writing results file: " + file)
 	w.WriteAll(records) // calls Flush internally
 	if err := w.Error(); err != nil {
 		panic(fmt.Errorf("error writing csv:", err))
 	}
-
 }

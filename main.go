@@ -47,6 +47,7 @@ type Bot struct {
 	BotName           string
 	Version           string
 	Logging           bool
+	Training          bool
 	TrainingDataFile  string
 	TrainingDataDir   string
 	TrainingOutputDir string
@@ -57,6 +58,7 @@ func NewBot() *Bot {
 		BotName:           BOTNAME,
 		Version:           VERSION,
 		Logging:           false, // initial state of logging
+		Training:          false, // initial state of training
 		TrainingDataDir:   "data",
 		TrainingDataFile:  "trainingdata.json",
 		TrainingOutputDir: "training",
@@ -172,11 +174,13 @@ func main() {
 	var collectdata bool
 	var preparedata bool
 	var trainmode bool
+	var traincoins string
 
 	flag.StringVar(&config, "config", "config", "config file to use")
 	flag.BoolVar(&collectdata, "collectdata", false, "collect ticker data and save to data folder as [unixtime].json")
 	flag.BoolVar(&preparedata, "preparedata", false, "Prepare collected ticker data for trianing runs")
 	flag.BoolVar(&trainmode, "train", false, "Start a training run")
+	flag.StringVar(&traincoins, "traincoins", "all", "coins to train with: 'config'=use config file, 'all' or comma separated list 'ETH,STR' etc")
 	flag.Parse()
 
 	// make Bot object
@@ -212,9 +216,9 @@ func main() {
 
 	// trainmode: fine tune params and analysis strategies using training data
 	if trainmode {
-
+		b.Training = true
 		b.LogInfo("Entering training mode")
-		b.Train()
+		b.Train(traincoins)
 		return // end program
 	}
 

@@ -1,12 +1,9 @@
 package main
 
 import (
-	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -111,7 +108,7 @@ func (b *Bot) PrepareData() {
 		// remap data and apply some filtering...
 		for myPair, myTickerEntry := range myTickerPlus {
 			// filter out non BTC
-			if !strings.HasPrefix(string(myPair), "BTC_") {
+			if !strings.HasPrefix(string(myPair), "BTC_") && string(myPair) != "USDT_BTC" {
 				continue
 			}
 			myTickerEntry.Timestamp = int64(timestamp)
@@ -207,62 +204,5 @@ func (b *Bot) loadPreparedData() *TrainingData {
 	for myPair, _ := range myTrainingData {
 		sort.Slice(myTrainingData[myPair], func(i, j int) bool { return myTrainingData[myPair][i].Timestamp < myTrainingData[myPair][j].Timestamp })
 	}
-
 	return &myTrainingData
-}
-
-// move to own file... ???
-func (b *Bot) Train() {
-
-	b.LogInfo("Loading training data")
-	myTrainingData := b.loadPreparedData()
-
-	// open a csv file for dumping data
-	// open data directory
-	_, err := ioutil.ReadDir(b.TrainingDataDir)
-	if err != nil {
-		b.LogErrorf("Fatal error reading data directory: %v (is it created?)", err)
-		return
-	}
-
-	file := b.TrainingOutputDir + "/" + "training.csv" // with git commit ? with latest time ?
-	f, err := os.Create(file)
-	if err != nil {
-		panic(fmt.Errorf("Fatal error opening file for writing: %s \n", err))
-	}
-	defer f.Close()
-
-	w := csv.NewWriter(f)
-	records := [][]string{
-		{"header0", "header1", "header2"},
-	}
-
-	// ------------------------------------------------------------
-	// main loop
-	fmt.Println(len((*myTrainingData)))
-	// calc permutations
-	// loop: over traing date using different analysis routines
-	//  vary the state parameters
-	//  loop: new state.
-	b.NewState()
-	b.Logging = false
-	b.LogInfo("You wont see this!")
-	rand.Seed(1970) // a good year
-	//     loop: coins (all or range?)
-	//      sum permutations and display for impatient analysers
-	//      prepare analyse
-	//      call analyse
-	//      do buy and sell
-	records = append(records, []string{"data0", "data1", "data2"})
-	//  stuff into CSV the profit, buys and sells for parameters varied and analysis chosen
-	// finish and rest!
-	// TODO use go routines to speed things on? Depends how slow!
-
-	// complete CSV
-	b.Logging = true
-	b.LogInfo("Writing results file: " + file)
-	w.WriteAll(records) // calls Flush internally
-	if err := w.Error(); err != nil {
-		panic(fmt.Errorf("error writing csv:", err))
-	}
 }

@@ -9,7 +9,7 @@ import (
 	"gitlab.com/wmlph/poloniex-api"
 )
 
-func (b *Bot) Trade() {
+func (b *Bot) Trade() (buys, sells int) {
 	/////////////////////////////////////
 	// this can be used in training or trading mode. Different set up for the analysers are used
 	// in that case and some reporting is not required
@@ -138,11 +138,16 @@ func (b *Bot) Trade() {
 	////////////////////////////////////////////
 	// Analyse coins
 	// for each coin get Analyse() to evaluate buy/sell and give a ranking of how strongly it is growing so we can prioritise
-	if sss == false && b.Training == false {
+	if sss == false {
 		b.LogInfo("ANALYSING DATA")
-
+		var coinData AnalysisData
 		for i, _ := range todo {
-			action, ranking := b.Analyse(todo[i].Coin)
+			if b.Training {
+				coinData = b.TrainPrepAnalysisData(todo[i].Coin)
+			} else {
+				coinData = b.PrepAnalysisData(todo[i].Coin)
+			}
+			action, ranking := b.Analyse(coinData)
 			todo[i].Action = action
 			todo[i].Ranking = ranking
 		}
@@ -150,13 +155,9 @@ func (b *Bot) Trade() {
 		sort.Slice(todo, func(i, j int) bool { return todo[i].Ranking > todo[j].Ranking })
 	}
 
-	if b.Training == true {
-		// TODO analysis setup for training...
-	}
-
 	////////////////////////////////////
 	// Place orders
-	b.PlaceBuyAndSellOrders(base, fragmenttotal, todo)
+	buys, sells = b.PlaceBuyAndSellOrders(base, fragmenttotal, todo)
 
 	basetotal = b.State[base].Balance
 	b.State[base].FiatValue = basetotal * FIATBTC
@@ -192,6 +193,7 @@ func (b *Bot) Trade() {
 		b.State[TOTAL].OrderNumber = s
 		b.State[TOTAL].Misc = fmt.Sprintf("%v", getTimeNow().Sub(b.State[START].Date))
 	}
+	return
 }
 
 func (b *Bot) GetTargettedCoins() (targets []string) {
@@ -204,12 +206,12 @@ func (b *Bot) GetTargettedCoins() (targets []string) {
 
 // buying and selling for each coin
 // using analysis to place our orders
-func (b *Bot) PlaceBuyAndSellOrders(base string, fragmenttotal float64, todo []coinaction) {
+func (b *Bot) PlaceBuyAndSellOrders(base string, fragmenttotal float64, todo []coinaction) (buys, sells int) {
 	///////////////////////////////////////////
 	b.LogInfo("PLACING ORDERS")
 	minbasetotrade := b.Conf.GetFloat64("TradingRules.minbasetotrade")
 	maxfragments := b.Conf.GetFloat64("TradingRules.fragments")
-	sales := 0
+	// 	sales := 0
 
 	for i, _ := range todo {
 		coin := todo[i].Coin
@@ -222,14 +224,14 @@ func (b *Bot) PlaceBuyAndSellOrders(base string, fragmenttotal float64, todo []c
 			// check enough balance to make an order (minorder)
 			// get current asking price
 			if basebalance > minbasetotrade {
-				Throttle()
+				// 				Throttle()
 				b.LogInfo(coin + " Placing BUY  order")
 				// TODO need to figure out fragments better - especially if an order does not sell or buy!!!
 				if fragmenttotal < maxfragments && basebalance > minbasetotrade*2 {
 					fragmenttotal++
 					basebalance = basebalance * (fragmenttotal / maxfragments)
 				}
-				b.Buy(base, coin, b.Ticker[base+"_"+coin].Ask, basebalance)
+				buys += b.Buy(base, coin, b.Ticker[base+"_"+coin].Ask, basebalance)
 
 			} else {
 				b.LogInfof(coin+" buy: Can't place buy order - balance of %v is lower (%v) than minbasetotrade rule (%v)", base, fc(basebalance), fc(minbasetotrade))
@@ -239,16 +241,17 @@ func (b *Bot) PlaceBuyAndSellOrders(base string, fragmenttotal float64, todo []c
 		if action == SELL {
 			// get current bidding price
 			// get balance and sell all
-			Throttle()
+			// 			Throttle()
 			b.LogInfo(coin + " Placing SELL order")
-			b.Sell(base, coin, b.Ticker[base+"_"+coin].Bid, coinbalance)
-			sales++
+			sells += b.Sell(base, coin, b.Ticker[base+"_"+coin].Bid, coinbalance)
+			// 			sales++
 		}
 
 		if action == NOACTION {
 			b.LogInfo(coin + " Nothing to do")
 		}
 	}
+	return
 }
 
 func getTimeNow() time.Time {

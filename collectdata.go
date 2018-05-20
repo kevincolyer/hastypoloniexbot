@@ -13,7 +13,7 @@ import (
 )
 
 type (
-	pair string // "BTC_STR"
+	Pair string // "BTC_STR"
 
 	// NOTE: to make a part of the struct not export (it will not import) just change the initial letter to lowercase
 	TickerEntryPlus struct {
@@ -30,9 +30,9 @@ type (
 		Timestamp int64   `json:"timestamp,string"` // TODO not expoterd!!! Capitalise to export...
 	}
 
-	TickerPlus map[pair]TickerEntryPlus
+	TickerPlus map[Pair]TickerEntryPlus
 
-	TrainingData map[pair][]TickerEntryPlus
+	TrainingData map[Pair][]TickerEntryPlus
 )
 
 func (b *Bot) CollectTickerData() {
@@ -66,7 +66,7 @@ func (b *Bot) CollectTickerData() {
 }
 
 func (b *Bot) PrepareData() {
-	myTrainingData := make(map[pair][]TickerEntryPlus)
+	myTrainingData := make(map[Pair][]TickerEntryPlus)
 
 	// open data directory
 	files, err := ioutil.ReadDir(b.TrainingDataDir)
@@ -99,7 +99,7 @@ func (b *Bot) PrepareData() {
 			continue
 		}
 
-		myTickerPlus := make(map[pair]TickerEntryPlus)
+		myTickerPlus := make(map[Pair]TickerEntryPlus)
 		err = json.Unmarshal(data, &myTickerPlus)
 		if err != nil {
 			panic(fmt.Errorf("Fatal error unmarshalling data file: %s \n", err))
@@ -183,7 +183,7 @@ func (b *Bot) PrepareData() {
 	b.LogInfo(file + " written ok.")
 }
 
-func (b *Bot) loadPreparedData() *TrainingData {
+func (b *Bot) loadPreparedData() TrainingData {
 	// check it exists
 	myTrainingData := make(TrainingData)
 	file := b.TrainingDataDir + "/" + b.TrainingDataFile
@@ -204,5 +204,5 @@ func (b *Bot) loadPreparedData() *TrainingData {
 	for myPair, _ := range myTrainingData {
 		sort.Slice(myTrainingData[myPair], func(i, j int) bool { return myTrainingData[myPair][i].Timestamp < myTrainingData[myPair][j].Timestamp })
 	}
-	return &myTrainingData
+	return myTrainingData
 }

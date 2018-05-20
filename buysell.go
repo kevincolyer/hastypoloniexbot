@@ -16,25 +16,25 @@ import (
 // 	return
 // }
 
-func (b *Bot) Buy(base, coin string, price, basebalance float64) {
+func (b *Bot) Buy(base, coin string, price, basebalance float64) int {
 	coinbalance := basebalance * (1 - b.Conf.GetFloat64("TradingRules.buyfee")) / price
 	if b.Conf.GetBool("BotControl.Simulate") {
 		// 		if b.Logging { Info.Println("Simulating buy order") }
 		if rand.Intn(20) == 0 {
 			b.LogWarning(coin + " Simulated Buy failed (random chance in 20)")
-			return
+			return 0
 		}
 		// assume a buy completes (to make simulation work!)
 		if b.State[base].Balance < basebalance {
 			b.LogWarning("Logic error - base balance is too low to actually purchase a coin!")
-			return
+			return 0
 		}
 		b.State[LAST].Coin = coin
 		b.State[coin].PurchasePrice = price
 
 		b.State[coin].Balance += coinbalance
 		b.State[coin].Coin = coin
-		b.State[coin].Date = time.Now()
+		b.State[coin].Date = b.Now // value is really now or faked for training
 		// TODO update date
 		b.State[base].Balance -= basebalance
 		// TODO update date
@@ -42,7 +42,7 @@ func (b *Bot) Buy(base, coin string, price, basebalance float64) {
 			b.State[base].Balance = 0
 		}
 		b.LogInfof(coin+" Buy  order placed for %v of %v at %v (paid %v %v)", fc(coinbalance), coin, fc(price), fc(basebalance), base)
-		return
+		return 1
 	}
 	////////////////////////////////////////////////
 	// Actual order
@@ -55,32 +55,32 @@ func (b *Bot) Buy(base, coin string, price, basebalance float64) {
 	b.State[base].Balance -= basebalance
 	if err != nil {
 		b.LogWarningf(coin+" BUY  order failed for %v with error: %v", coin, err)
-		return
+		return 0
 	}
 	if buyorder.OrderNumber == 0 {
 		b.LogWarning(coin + " BUY  order was not placed at exchange")
-		return
+		return 0
 	}
 	b.State[coin].Date = time.Now()
 	b.State[coin].PurchasePrice = price
 	b.State[coin].OrderNumber = strconv.FormatInt(buyorder.OrderNumber, 10)
 	b.State[coin].Balance += basebalance / price
-	return
+	return 1
 }
 
-func (b *Bot) Sell(base, coin string, price, coinbalance float64) {
+func (b *Bot) Sell(base, coin string, price, coinbalance float64) int {
 	valueafterfees := price * (1 - b.Conf.GetFloat64("TradingRules.sellfee")) * coinbalance
 	if b.Conf.GetBool("BotControl.Simulate") {
 		//if b.Logging { Info.Println("Simulating Sell order") }
 
 		if rand.Intn(20) == 0 {
 			b.LogWarning(coin + " Simulated Sell failed (random chance in 20)")
-			return
+			return 0
 		}
 		// assume a sale completes (to make simulation work!)
 		b.State[LAST].Coin = base
 		b.State[coin].PurchasePrice = price
-		b.State[coin].SaleDate = time.Now()
+		b.State[coin].SaleDate = b.Now // value is real or faked for training
 		//value:=price*coinbalance
 
 		b.State[coin].Balance -= coinbalance
@@ -92,7 +92,7 @@ func (b *Bot) Sell(base, coin string, price, coinbalance float64) {
 		}
 
 		b.LogInfof(coin+" Sell order placed for %v of %v at %v (received %v %v)", fc(coinbalance), coin, fc(price), fc(valueafterfees), base)
-		return
+		return 1
 	}
 	////////////////////////////////////////////////
 	// Actual order
@@ -103,17 +103,18 @@ func (b *Bot) Sell(base, coin string, price, coinbalance float64) {
 	sellorder, err := b.Exchange.Sell(base+"_"+coin, price, coinbalance)
 	if err != nil {
 		b.LogWarningf(coin+" SELL order failed for %v with error: %v", coin, err)
-		return
+		return 0
 	}
 
 	if sellorder.OrderNumber == 0 {
 		b.LogWarningf(coin + " SELL order was not placed at exchange")
-		return
+		return 0
 	}
 	// provisional values - sale might not go ahead!
 	b.State[coin].Balance = 0
 	b.State[base].Balance += valueafterfees
 	b.State[coin].SaleDate = time.Now()
+	return 1
 }
 
 func (b *Bot) CancelAllOpenOrders(base string, targets []string) (ok bool) {

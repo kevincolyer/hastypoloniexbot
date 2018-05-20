@@ -51,6 +51,9 @@ type Bot struct {
 	TrainingDataFile  string
 	TrainingDataDir   string
 	TrainingOutputDir string
+	TrainingDataTick  int
+	MyTrainingData    TrainingData
+	Now               time.Time
 }
 
 func NewBot() *Bot {
@@ -217,6 +220,7 @@ func main() {
 	// trainmode: fine tune params and analysis strategies using training data
 	if trainmode {
 		b.Training = true
+		b.Conf.Set("BotControl.Simulate", "true") // really don't want to use real data!
 		b.LogInfo("Entering training mode")
 		b.Train(traincoins)
 		return // end program

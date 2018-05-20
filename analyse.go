@@ -37,8 +37,7 @@ func CalcSMA(closes []float64, periods, offset int) (sma float64) {
 	return
 }
 
-func (b *Bot) Analyse(coin string) (advice action, ranking float64) {
-	advice = NOACTION
+func (b *Bot) PrepAnalysisData(coin string) AnalysisData {
 	pair := b.Conf.GetString("Currency.Base") + "_" + coin
 	period := b.Conf.GetInt("Analysis.period")
 	// 	b.LogInfof(coin+" Analysis using ema and sma for period of %v\n", period) // redundant
@@ -46,46 +45,46 @@ func (b *Bot) Analyse(coin string) (advice action, ranking float64) {
 	data, err := b.Exchange.ChartDataPeriod(pair, period)
 	if err != nil {
 		b.LogWarningf("Could not retrieve data for pair %s. Error %v\n", pair, err)
-		return
+		return AnalysisData{}
 	}
 	closings := mungeCoinChartData(data)
 
-	d := analysisdata{coin: coin}
+	d := AnalysisData{
+		coin: coin,
 
-	d.emaperiods = b.Conf.GetInt("Analysis.ema")
-	d.smaperiods = b.Conf.GetInt("Analysis.sma")
-	d.sma = CalcSMA(closings, d.smaperiods, 0)
-	d.ema = CalcEMA(closings, d.emaperiods)
+		emaperiods:    b.Conf.GetInt("Analysis.ema"),
+		smaperiods:    b.Conf.GetInt("Analysis.sma"),
+		triggerbuy:    b.Conf.GetFloat64("TradingRules.triggerbuy"),
+		maxlosstorisk: b.Conf.GetFloat64("TradingRules.maxlosstorisk"),
+		triggersell:   b.Conf.GetFloat64("TradingRules.triggersell"),
+		maxgrowth:     b.Conf.GetFloat64("TradingRules.maxgrowth"),
+		sma:           CalcSMA(closings, b.Conf.GetInt("Analysis.ema"), 0),
+		ema:           CalcEMA(closings, b.Conf.GetInt("Analysis.sma")),
+		currentprice:  closings[0],
+		coinbalance:   b.State[coin].Balance,
+		lastcoin:      b.State[LAST].Coin,
+		purchasedate:  b.State[coin].Date,
+		lastsold:      b.State[coin].SaleDate,
+		lastema:       b.State[coin].LastEma,
+		lastsma:       b.State[coin].LastSma,
+		purchaseprice: b.State[coin].PurchasePrice,
+	}
 
-	d.coinbalance = b.State[coin].Balance
-	d.lastcoin = b.State[LAST].Coin
-	d.purchasedate = b.State[coin].Date
-	d.lastsold = b.State[coin].SaleDate
-	d.lastema = b.State[coin].LastEma
-	d.lastsma = b.State[coin].LastSma
 	b.State[coin].LastEma = d.ema
 	b.State[coin].LastSma = d.sma
 	d.cooloffduration, _ = time.ParseDuration(b.Conf.GetString("TradingRules.CoolOffDuration"))
-	// 	if err != nil {
-	// 		dur, _ = time.ParseDuration("2h")
-	// 			b.LogWarningf("Couldn't parse CoolOffDuration (%v). Setting default to %v\n", b.Conf.GetString("TradingRules.CoolOffDuration"), dur)
-	// 	}
-	if d.coinbalance == 0 && d.lastsold.After(time.Now().Add(-d.cooloffduration)) {
+	// store current time (used to fake time for training data)
+	b.Now = time.Now()
+	if d.coinbalance == 0 && d.lastsold.After(b.Now.Add(-d.cooloffduration)) {
 		d.cooloffperiod = true
 	}
 
-	d.triggerbuy = b.Conf.GetFloat64("TradingRules.triggerbuy")
-	d.purchaseprice = b.State[coin].PurchasePrice
-	d.currentprice = closings[0] // TODO need a better indicator
-	d.maxlosstorisk = b.Conf.GetFloat64("TradingRules.maxlosstorisk")
-	d.triggersell = b.Conf.GetFloat64("TradingRules.triggersell")
-	d.maxgrowth = b.Conf.GetFloat64("TradingRules.maxgrowth")
-	d.HeldForLongEnough = d.purchasedate.After(time.Now().Add(-time.Hour * 22)) // yuk
+	d.HeldForLongEnough = d.purchasedate.After(b.Now.Add(-time.Hour * 22)) // yuk
 
-	return b.AnalyseChartData(d)
+	return d
 }
 
-type analysisdata struct {
+type AnalysisData struct {
 	//	advice          int
 	//	ranking         float64
 	ema               float64
@@ -112,8 +111,10 @@ type analysisdata struct {
 	maxgrowth         float64
 }
 
-func (b *Bot) AnalyseChartData(d analysisdata) (advice action, ranking float64) {
+func (b *Bot) Analyse(d AnalysisData) (advice action, ranking float64) {
+	advice = NOACTION
 	ranking = 0
+
 	diff := d.ema - d.sma
 	advice = NOACTION
 	anal := d.coin + " "

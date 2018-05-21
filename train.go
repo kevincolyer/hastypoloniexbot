@@ -102,11 +102,14 @@ func (b *Bot) Train(traincoins string) {
 			steps, err = strconv.Atoi(value)
 		case "lim":
 			lim, err = strconv.Atoi(value)
+                case "af":
+                        cacheAnalysisFunc=value
 		}
 	}
-	//cache this value for now
+	//cache some values for now
 	cacheCooloffduration, _ = time.ParseDuration(b.Conf.GetString("TradingRules.CoolOffDuration"))
-
+        minbasetotrade := b.Conf.GetFloat64("TradingRules.minbasetotrade")
+        
 	// setup variables for loop
 	tbSteps := (tbHi - tbLo) / float64(steps)
 	if lim > 0 {
@@ -121,7 +124,6 @@ func (b *Bot) Train(traincoins string) {
 		b.Conf.Set("TradingRules.triggerbuy", tb)
 		for ts := 0.0; ts < tb; ts += tbSteps {
 			b.Conf.Set("TradingRules.triggersell", ts)
-			//             fmt.Println(b.Conf.Get("TradingRules.triggerbuy"),b.Conf.Get("TradingRules.triggersell"))
 			//-----------------------------------------------------------
 			b.NewState()
 			rand.Seed(1970) // a good year
@@ -151,13 +153,15 @@ func (b *Bot) Train(traincoins string) {
 				}
 
 				// Run trade for this moment...
-				b, s := b.Trade()
-				buys += b
-				sells += s
-				// prepare analyse?
-				// call analyse not needed????
-
-			}
+				bb, ss := b.Trade()
+				buys += bb
+				sells += ss
+				// shortcut end if run out of currency to trade with
+				if buys==sells && b.State["BTC"].Balance<=minbasetotrade {
+                                    counter+=lengthTrainingData-tick
+                                    break
+                                }
+			} // end tick loop
 
 			// Get bitcoin value of all trades
 			baseTotal := b.State["BTC"].Balance
@@ -227,3 +231,4 @@ func (b *Bot) TrainPrepAnalysisData(coin string) AnalysisData {
 }
 
 var cacheCooloffduration time.Duration
+var cacheAnalysisFunc string

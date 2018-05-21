@@ -186,7 +186,7 @@ func main() {
 	flag.BoolVar(&preparedata, "preparedata", false, "Prepare collected ticker data for trianing runs")
 	flag.BoolVar(&trainmode, "train", false, "Start a training run")
 	flag.StringVar(&traincoins, "traincoins", "all", "coins to train with: 'config'=use config file, 'all' or comma separated list 'ETH,STR' etc")
-	flag.StringVar(&trainparams, "trainparams", "", "'lim=1000,tblo=0.008' comma sep list of training params.")
+	flag.StringVar(&trainparams, "trainparams", "", "comma sep list of training params. 'lim=1000,tblo=0.008,af=02' af is analyse function. ")
 	flag.Parse()
 
 	// make Bot object

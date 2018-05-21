@@ -8,8 +8,8 @@ import (
 	"math/rand"
 	"os"
 	// 	"sort"
-	// 	"strconv"
 	"gitlab.com/wmlph/poloniex-api"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -29,7 +29,11 @@ func (b *Bot) Train(traincoins string) {
 		return
 	}
 
-	file := b.TrainingOutputDir + "/" + "training.csv" // with git commit ? with latest time ?
+	b.TrainingParams = strings.ToLower(b.TrainingParams)
+
+	file := b.TrainingOutputDir + "/" + fmt.Sprintf("%d", time.Now().Unix()) + "-" + strings.Replace(b.TrainingParams, "=", "-", -1) + ".csv" // with git commit ? with latest time ?//TODO Bug here?
+
+	fmt.Println(file)
 	f, err := os.Create(file)
 	if err != nil {
 		panic(fmt.Errorf("Fatal error opening file for writing: %s \n", err))
@@ -62,34 +66,64 @@ func (b *Bot) Train(traincoins string) {
 	}
 	fmt.Println("Using these currencies:", b.Conf.GetString("Currency.targets"))
 	targets := strings.Split(b.Conf.GetString("Currency.targets"), ",")
-
+	p := make(map[string]string)
+	for _, value := range strings.Split(b.TrainingParams, ",") {
+		kv := strings.Split(value, "=")
+		p[kv[0]] = kv[1]
+	}
+	fmt.Println("Using these params: ", p)
 	// ------------------------------------------------------------
-	// main loop
+	// prep for MAIN LOOP
 	// TODO use go routines to speed things on? Depends how slow!
 	var tickerpairs []Pair
 	for keys, _ := range b.MyTrainingData {
 		tickerpairs = append(tickerpairs, keys) // b.Ticker has strings as keys
 	}
-	//fmt.Printf("tickerpairs %v\n", tickerpairs)
 
 	b.Logging = false
 	b.LogInfo("You wont see this!")
 
-	// calc permutations
 	lengthTrainingData := len(b.MyTrainingData["USDT_BTC"])
-	// loop: over traing date using different analysis routines
-	//  vary the state parameters
-	//  loop: new state.
-	permutations := lengthTrainingData * 28 * 20
+	// defaults
+	tbLo := 0.005
+	tbHi := 0.095
+	steps := 10
+	lim := 20 * 24 // one day's worth of 5 min intervals
+	//lim*=7
+
+	// Overrides from TrainingParams
+	for key, value := range p {
+		switch key {
+		case "tblo":
+			tbLo, err = strconv.ParseFloat(value, 64)
+		case "tbhi":
+			tbHi, err = strconv.ParseFloat(value, 64)
+		case "steps":
+			steps, err = strconv.Atoi(value)
+		case "lim":
+			lim, err = strconv.Atoi(value)
+		}
+	}
+	//cache this value for now
+	cacheCooloffduration, _ = time.ParseDuration(b.Conf.GetString("TradingRules.CoolOffDuration"))
+
+	// setup variables for loop
+	tbSteps := (tbHi - tbLo) / float64(steps)
+	if lim > 0 {
+		lengthTrainingData = lim
+	} // truncate it for speed in debugging
+	permutations := lengthTrainingData * steps * steps * (steps + 1) / 2 // 1/2n(n+1)
+	b.Ticker = make(poloniex.Ticker)
+	maxprofit := -1.0
 	counter := 1
-	for tb := 0.0010; tb < 0.02; tb += 0.0005 { //38
+	// MAIN LOOP
+	for tb := tbLo; tb < tbHi; tb += tbSteps { //38
 		b.Conf.Set("TradingRules.triggerbuy", tb)
-		for ts := 0.0; ts < tb; ts += 0.0005 {
+		for ts := 0.0; ts < tb; ts += tbSteps {
 			b.Conf.Set("TradingRules.triggersell", ts)
 			//             fmt.Println(b.Conf.Get("TradingRules.triggerbuy"),b.Conf.Get("TradingRules.triggersell"))
 			//-----------------------------------------------------------
 			b.NewState()
-			b.Ticker = make(poloniex.Ticker)
 			rand.Seed(1970) // a good year
 
 			buys := 0
@@ -99,7 +133,7 @@ func (b *Bot) Train(traincoins string) {
 			// loop training data
 			for tick := 0; tick < lengthTrainingData; tick++ {
 				counter++
-				fmt.Printf("\rCalculating %v of %v ", Comma(float64(counter)), Comma(float64(permutations)))
+				fmt.Printf("\rCalculating %v of %v ", CommaInt(counter), CommaInt(permutations))
 				b.TrainingDataTick = tick
 				// Load Ticker
 				//      prepare ticker - include USDT_BTC as well as coins
@@ -124,7 +158,6 @@ func (b *Bot) Train(traincoins string) {
 				// call analyse not needed????
 
 			}
-			fmt.Println()
 
 			// Get bitcoin value of all trades
 			baseTotal := b.State["BTC"].Balance
@@ -132,9 +165,12 @@ func (b *Bot) Train(traincoins string) {
 				coinBalance := b.State[coin].Balance
 				baseTotal += b.Ticker["BTC_"+coin].Last * coinBalance
 			}
-
+			profit := baseTotal - initialBalance
 			// calc profit or loss
-			fmt.Printf("tb %v ts %v buys %v sells %v profit %v\n", tb, ts, buys, sells, fc(baseTotal-initialBalance))
+			if profit > maxprofit {
+				fmt.Printf("\ntb:%v, ts:%v, buys:%v, sells:%v, profit:%v\n", tb, ts, buys, sells, fc(baseTotal-initialBalance))
+				maxprofit = profit
+			}
 			r := strings.Split(fmt.Sprintf("%v %v %v %v %v", tb, ts, buys, sells, baseTotal-initialBalance), " ")
 
 			//  stuff into CSV the profit, buys and sells for parameters varied and analysis chosen
@@ -144,6 +180,7 @@ func (b *Bot) Train(traincoins string) {
 
 	//----------------------------------------------------------
 	// complete CSV
+	fmt.Println()
 	b.Logging = true
 	b.LogInfo("Writing results file: " + file)
 	w.WriteAll(records) // calls Flush internally
@@ -178,7 +215,7 @@ func (b *Bot) TrainPrepAnalysisData(coin string) AnalysisData {
 
 	b.State[coin].LastEma = d.ema
 	b.State[coin].LastSma = d.sma
-	d.cooloffduration, _ = time.ParseDuration(b.Conf.GetString("TradingRules.CoolOffDuration"))
+	d.cooloffduration = cacheCooloffduration
 
 	b.Now = time.Unix(b.MyTrainingData[pair][tick].Timestamp, 0) // convert time stamp to "now" time
 	if d.coinbalance == 0 && d.lastsold.After(b.Now.Add(-d.cooloffduration)) {
@@ -188,3 +225,5 @@ func (b *Bot) TrainPrepAnalysisData(coin string) AnalysisData {
 
 	return d
 }
+
+var cacheCooloffduration time.Duration

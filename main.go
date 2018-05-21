@@ -52,6 +52,7 @@ type Bot struct {
 	TrainingDataDir   string
 	TrainingOutputDir string
 	TrainingDataTick  int
+	TrainingParams    string
 	MyTrainingData    TrainingData
 	Now               time.Time
 }
@@ -178,12 +179,14 @@ func main() {
 	var preparedata bool
 	var trainmode bool
 	var traincoins string
+	var trainparams string
 
 	flag.StringVar(&config, "config", "config", "config file to use")
 	flag.BoolVar(&collectdata, "collectdata", false, "collect ticker data and save to data folder as [unixtime].json")
 	flag.BoolVar(&preparedata, "preparedata", false, "Prepare collected ticker data for trianing runs")
 	flag.BoolVar(&trainmode, "train", false, "Start a training run")
 	flag.StringVar(&traincoins, "traincoins", "all", "coins to train with: 'config'=use config file, 'all' or comma separated list 'ETH,STR' etc")
+	flag.StringVar(&trainparams, "trainparams", "", "'lim=1000,tblo=0.008' comma sep list of training params.")
 	flag.Parse()
 
 	// make Bot object
@@ -222,6 +225,7 @@ func main() {
 		b.Training = true
 		b.Conf.Set("BotControl.Simulate", "true") // really don't want to use real data!
 		b.LogInfo("Entering training mode")
+		b.TrainingParams = trainparams
 		b.Train(traincoins)
 		return // end program
 	}

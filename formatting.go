@@ -42,6 +42,10 @@ func Comma(n float64) string {
 	return reverseStr(everyThird(reverseStr(i[0]), ",")) + "." + i[1]
 }
 
+func CommaInt(n int) string {
+	return reverseStr(everyThird(reverseStr(fmt.Sprintf("%d", n)), ","))
+}
+
 func everyThird(str, insert string) (s string) {
 	if str == "" {
 		return

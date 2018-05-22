@@ -148,7 +148,7 @@ func (b *Bot) StateInit() {
 func (b *Bot) NewState() {
 	b.State = make(map[string]*coinstate)
 	// defaults
-	b.State[b.Conf.GetString("Currency.Base")] = &coinstate{Balance: 0.1, Coin: "BTC"}
+	b.State[b.Conf.GetString("Currency.Base")] = &coinstate{Balance: 1, Coin: "BTC"} // updated this and also minbasetotrade=0.2
 	b.State[b.Conf.GetString("Currency.Target")] = &coinstate{}
 	b.State[LAST] = &coinstate{Coin: "BTC"}
 	b.State[TOTAL] = &coinstate{Coin: "BTC"}

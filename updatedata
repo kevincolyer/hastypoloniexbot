@@ -1,0 +1,5 @@
+#!/bin/bash
+
+
+rsync -av pi@traderjoe:/home/pi/data/*.json data/
+go run *.go -preparedata

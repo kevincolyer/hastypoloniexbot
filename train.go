@@ -84,6 +84,7 @@ func (b *Bot) Train(traincoins string) {
 	b.LogInfo("You wont see this!")
 
 	lengthTrainingData := len(b.MyTrainingData["USDT_BTC"])
+	fmt.Println("Count of available training data:", lengthTrainingData)
 	// defaults
 	tbLo := 0.005
 	tbHi := 0.095
@@ -102,19 +103,20 @@ func (b *Bot) Train(traincoins string) {
 			steps, err = strconv.Atoi(value)
 		case "lim":
 			lim, err = strconv.Atoi(value)
-                case "af":
-                        cacheAnalysisFunc=value
+		case "af":
+			cacheAnalysisFunc = value
 		}
 	}
 	//cache some values for now
 	cacheCooloffduration, _ = time.ParseDuration(b.Conf.GetString("TradingRules.CoolOffDuration"))
-        minbasetotrade := b.Conf.GetFloat64("TradingRules.minbasetotrade")
-        
+	minbasetotrade := b.Conf.GetFloat64("TradingRules.minbasetotrade")
+
 	// setup variables for loop
 	tbSteps := (tbHi - tbLo) / float64(steps)
+	// limit ticks to speed debugging
 	if lim > 0 {
-		lengthTrainingData = lim
-	} // truncate it for speed in debugging
+		lim = MinInt(lim, lengthTrainingData)
+	}
 	permutations := lengthTrainingData * steps * steps * (steps + 1) / 2 // 1/2n(n+1)
 	b.Ticker = make(poloniex.Ticker)
 	maxprofit := -1.0
@@ -157,10 +159,10 @@ func (b *Bot) Train(traincoins string) {
 				buys += bb
 				sells += ss
 				// shortcut end if run out of currency to trade with
-				if buys==sells && b.State["BTC"].Balance<=minbasetotrade {
-                                    counter+=lengthTrainingData-tick
-                                    break
-                                }
+				if buys == sells && b.State["BTC"].Balance <= minbasetotrade {
+					counter += lengthTrainingData - tick
+					break
+				}
 			} // end tick loop
 
 			// Get bitcoin value of all trades
@@ -232,3 +234,17 @@ func (b *Bot) TrainPrepAnalysisData(coin string) AnalysisData {
 
 var cacheCooloffduration time.Duration
 var cacheAnalysisFunc string
+
+func MinInt(i, j int) int {
+	if i < j {
+		return i
+	}
+	return j
+}
+
+func MaxInt(i, j int) int {
+	if i > j {
+		return i
+	}
+	return j
+}

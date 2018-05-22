@@ -132,13 +132,13 @@ func pdiff(e, s float64) float64 {
 //-----------------------------------------------------
 // dispatches to relevant analyser
 func (b *Bot) Analyse(d AnalysisData) (advice action, ranking float64) {
-        switch d.analysisfunc {
-            case "02":
-                return b.Analyse02(d)
-            default:
-                return b.Analyse01(d)
-        }
-        return
+	switch d.analysisfunc {
+	case "02":
+		return b.Analyse02(d)
+	default:
+		return b.Analyse01(d)
+	}
+	return
 }
 
 func (b *Bot) Analyse01(d AnalysisData) (advice action, ranking float64) {
@@ -316,11 +316,11 @@ func (b *Bot) Analyse02(d AnalysisData) (advice action, ranking float64) {
 		// coin is trending down in value
 		// TODO CARE NEEDED HERE!
 		// curent price < purchase price-allowable loss the advice = sell
-// 		if percentloss < 0 && -percentloss > d.maxlosstorisk {
-// 			advice = SELL
-// 			b.LogInfof(anal+"ADVICE Recommend SELL as loss %v %% is less than maxlosstorisk %v %%\n", fp2(percentloss), fp2(d.maxlosstorisk))
-// 			return
-// 		}
+		// 		if percentloss < 0 && -percentloss > d.maxlosstorisk {
+		// 			advice = SELL
+		// 			b.LogInfof(anal+"ADVICE Recommend SELL as loss %v %% is less than maxlosstorisk %v %%\n", fp2(percentloss), fp2(d.maxlosstorisk))
+		// 			return
+		// 		}
 		// current price > purchase price info - keep - coin is growing in value
 		if percentloss == 0 {
 			b.LogWarning(anal + "ADVICE NOACTION Coin is in profit and growing in value but trending down")
@@ -329,18 +329,17 @@ func (b *Bot) Analyse02(d AnalysisData) (advice action, ranking float64) {
 		// current price > purchase price + max allowed growth - sell (get out on top)
 
 	}
-// 	growth := (d.currentprice - d.purchaseprice) / d.purchaseprice
-// 	if d.coinbalance > 0 && growth > d.maxgrowth {
-// 		b.LogInfof(anal+"ADVICE SELL:  %v times greater than purchase price - triggered maxgrowth %v\n", fn(growth), fn(d.maxgrowth))
-// 		advice = SELL
-// 		return
-// 	}
-// 	if d.coinbalance > 0 && d.HeldForLongEnough {
-// 		b.LogInfof(anal + "ADVICE SELL: Held for long enough threshold exceeded.\n")
-// 		advice = SELL
-// 		return
-// 	}
+	// 	growth := (d.currentprice - d.purchaseprice) / d.purchaseprice
+	// 	if d.coinbalance > 0 && growth > d.maxgrowth {
+	// 		b.LogInfof(anal+"ADVICE SELL:  %v times greater than purchase price - triggered maxgrowth %v\n", fn(growth), fn(d.maxgrowth))
+	// 		advice = SELL
+	// 		return
+	// 	}
+	// 	if d.coinbalance > 0 && d.HeldForLongEnough {
+	// 		b.LogInfof(anal + "ADVICE SELL: Held for long enough threshold exceeded.\n")
+	// 		advice = SELL
+	// 		return
+	// 	}
 	b.LogInfo(anal + "ADVICE Nothing to do. No concerns")
 	return
 }
-

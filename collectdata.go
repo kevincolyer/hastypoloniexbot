@@ -119,6 +119,8 @@ func (b *Bot) PrepareData() {
 	} // end for each file
 
 	// data is currently unsorted. sort on timestamp key here
+	minDataLength := 1000000
+	maxDataLength := 0
 	for myPair, _ := range myTrainingData {
 		sort.Slice(myTrainingData[myPair], func(i, j int) bool { return myTrainingData[myPair][i].Timestamp < myTrainingData[myPair][j].Timestamp })
 
@@ -166,9 +168,19 @@ func (b *Bot) PrepareData() {
 		}
 		// truncate data
 		myTrainingData[myPair] = myTrainingData[myPair][trunc:]
-
+		minDataLength = MinInt(minDataLength, len(myTrainingData[myPair]))
+		maxDataLength = MaxInt(maxDataLength, len(myTrainingData[myPair]))
 	}
 	fmt.Println()
+	if minDataLength != maxDataLength {
+		fmt.Println("Problem: length varies between different pair data (min max):", minDataLength, maxDataLength)
+		for myPair, _ := range myTrainingData {
+			if len(myTrainingData[myPair]) < maxDataLength {
+				fmt.Printf("%v length %v is less than %v. Removing from training data\n", myPair, len(myTrainingData[myPair]), maxDataLength)
+				delete(myTrainingData, myPair)
+			}
+		}
+	}
 
 	// marshall to json and save
 	j, err := json.Marshal(myTrainingData)

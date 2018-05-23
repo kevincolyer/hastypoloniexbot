@@ -86,8 +86,8 @@ func (b *Bot) Train(traincoins string) {
 	lengthTrainingData := len(b.MyTrainingData["USDT_BTC"])
 	fmt.Println("Count of available training data:", lengthTrainingData)
 	// defaults
-	tbLo := 0.005
-	tbHi := 0.095
+	tbLo := 0.045
+	tbHi := 0.150
 	steps := 10
 	lim := 20 * 24 // one day's worth of 5 min intervals
 	//lim*=7
@@ -191,7 +191,7 @@ func (b *Bot) Train(traincoins string) {
 	b.LogInfo("Writing results file: " + file)
 	w.WriteAll(records) // calls Flush internally
 	if err := w.Error(); err != nil {
-		panic(fmt.Errorf("error writing csv:", err))
+		panic(fmt.Errorf("error writing csv: %v", err))
 	}
 }
 
@@ -222,12 +222,10 @@ func (b *Bot) TrainPrepAnalysisData(coin string) AnalysisData {
 	b.State[coin].LastEma = d.ema
 	b.State[coin].LastSma = d.sma
 	d.cooloffduration = cacheCooloffduration
+	d.analysisfunc = cacheAnalysisFunc
 
 	b.Now = time.Unix(b.MyTrainingData[pair][tick].Timestamp, 0) // convert time stamp to "now" time
-	if d.coinbalance == 0 && d.lastsold.After(b.Now.Add(-d.cooloffduration)) {
-		d.cooloffperiod = true
-	}
-	d.HeldForLongEnough = d.purchasedate.After(b.Now.Add(-time.Hour * 22)) // yuk
+	CheckDuration(b.Now, b, &d)
 
 	return d
 }

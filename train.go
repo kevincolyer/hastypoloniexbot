@@ -104,14 +104,19 @@ func (b *Bot) Train(traincoins string) {
 		case "lim":
 			lim, err = strconv.Atoi(value)
 		case "af":
-			cacheAnalysisFunc = value
+			c.AnalysisFunc = value
 		}
 	}
 	//cache some values for now
-	cacheCooloffduration, _ = time.ParseDuration(b.Conf.GetString("TradingRules.CoolOffDuration"))
-	minbasetotrade := b.Conf.GetFloat64("TradingRules.minbasetotrade")
+	c.emaperiods = b.Conf.GetInt("Analysis.ema")
+	c.smaperiods = b.Conf.GetInt("Analysis.sma")
+	c.maxlosstorisk = b.Conf.GetFloat64("TradingRules.maxlosstorisk")
+	c.maxgrowth = b.Conf.GetFloat64("TradingRules.maxgrowth")
+	c.Cooloffduration, _ = time.ParseDuration(b.Conf.GetString("TradingRules.CoolOffDuration"))
+        c.base=b.Conf.GetString("Currency.Base")
 
 	// setup variables for loop
+	minbasetotrade := b.Conf.GetFloat64("TradingRules.minbasetotrade")
 	tbSteps := (tbHi - tbLo) / float64(steps)
 	// limit ticks to speed debugging
 	if lim > 0 {
@@ -123,9 +128,9 @@ func (b *Bot) Train(traincoins string) {
 	counter := 1
 	// MAIN LOOP
 	for tb := tbLo; tb < tbHi; tb += tbSteps { //38
-		b.Conf.Set("TradingRules.triggerbuy", tb)
+		c.triggerbuy = tb
 		for ts := 0.0; ts < tb; ts += tbSteps {
-			b.Conf.Set("TradingRules.triggersell", ts)
+			c.triggersell = ts
 			//-----------------------------------------------------------
 			b.NewState()
 			rand.Seed(1970) // a good year
@@ -191,22 +196,22 @@ func (b *Bot) Train(traincoins string) {
 	b.LogInfo("Writing results file: " + file)
 	w.WriteAll(records) // calls Flush internally
 	if err := w.Error(); err != nil {
-		panic(fmt.Errorf("error writing csv:", err))
+		panic(fmt.Errorf("error writing csv: %v", err))
 	}
 }
 
 func (b *Bot) TrainPrepAnalysisData(coin string) AnalysisData {
-	pair := Pair(b.Conf.GetString("Currency.Base") + "_" + coin)
 	tick := b.TrainingDataTick
-
+        pair:=Pair(c.base+"_"+coin)
 	d := AnalysisData{
+
 		coin:          coin,
-		emaperiods:    b.Conf.GetInt("Analysis.ema"),
-		smaperiods:    b.Conf.GetInt("Analysis.sma"),
-		triggerbuy:    b.Conf.GetFloat64("TradingRules.triggerbuy"),
-		maxlosstorisk: b.Conf.GetFloat64("TradingRules.maxlosstorisk"),
-		triggersell:   b.Conf.GetFloat64("TradingRules.triggersell"),
-		maxgrowth:     b.Conf.GetFloat64("TradingRules.maxgrowth"),
+		emaperiods:    c.emaperiods,
+		smaperiods:    c.smaperiods,
+		triggerbuy:    c.triggerbuy,
+		maxlosstorisk: c.maxlosstorisk,
+		triggersell:   c.triggersell,
+		maxgrowth:     c.maxgrowth,
 		sma:           b.MyTrainingData[pair][tick].Sma50,
 		ema:           b.MyTrainingData[pair][tick].Ema30,
 		currentprice:  b.MyTrainingData[pair][tick].Last,
@@ -221,7 +226,7 @@ func (b *Bot) TrainPrepAnalysisData(coin string) AnalysisData {
 
 	b.State[coin].LastEma = d.ema
 	b.State[coin].LastSma = d.sma
-	d.cooloffduration = cacheCooloffduration
+	d.cooloffduration = c.Cooloffduration
 
 	b.Now = time.Unix(b.MyTrainingData[pair][tick].Timestamp, 0) // convert time stamp to "now" time
 	if d.coinbalance == 0 && d.lastsold.After(b.Now.Add(-d.cooloffduration)) {
@@ -232,8 +237,22 @@ func (b *Bot) TrainPrepAnalysisData(coin string) AnalysisData {
 	return d
 }
 
-var cacheCooloffduration time.Duration
-var cacheAnalysisFunc string
+type confCache struct {
+	Cooloffduration time.Duration
+	AnalysisFunc    string
+	emaperiods      int
+	smaperiods      int
+	triggerbuy      float64
+	maxlosstorisk   float64
+	triggersell     float64
+	maxgrowth       float64
+	base            string
+     cacheAnalysisFunc string
+}
+
+var c confCache
+
+// var cacheCooloffduration time.Duration
 
 func MinInt(i, j int) int {
 	if i < j {

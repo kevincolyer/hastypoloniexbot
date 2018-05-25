@@ -23,6 +23,7 @@ type coinstate struct {
 	Date           time.Time
 	SaleDate       time.Time
 	PurchasePrice  float64
+	LastPrice      float64
 	PurchaseAmount float64
 	OrderNumber    string
 	FiatValue      float64

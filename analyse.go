@@ -61,6 +61,7 @@ func (b *Bot) PrepAnalysisData(coin string) AnalysisData {
 		sma:           CalcSMA(closings, b.Conf.GetInt("Analysis.ema"), 0),
 		ema:           CalcEMA(closings, b.Conf.GetInt("Analysis.sma")),
 		currentprice:  closings[0],
+		lastprice:     b.State[coin].LastPrice,
 		coinbalance:   b.State[coin].Balance,
 		lastcoin:      b.State[LAST].Coin,
 		purchasedate:  b.State[coin].Date,
@@ -70,6 +71,7 @@ func (b *Bot) PrepAnalysisData(coin string) AnalysisData {
 		purchaseprice: b.State[coin].PurchasePrice,
 	}
 
+	b.State[coin].LastPrice = d.currentprice
 	b.State[coin].LastEma = d.ema
 	b.State[coin].LastSma = d.sma
 	d.cooloffduration, _ = time.ParseDuration(b.Conf.GetString("TradingRules.CoolOffDuration"))
@@ -111,6 +113,7 @@ type AnalysisData struct {
 	HeldForLongEnough bool
 	cooloffduration   time.Duration
 	currentprice      float64
+	lastprice         float64
 	//maxholdduration   bool
 	lastema       float64
 	lastsma       float64

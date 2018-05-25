@@ -113,7 +113,7 @@ func (b *Bot) Train(traincoins string) {
 	c.maxlosstorisk = b.Conf.GetFloat64("TradingRules.maxlosstorisk")
 	c.maxgrowth = b.Conf.GetFloat64("TradingRules.maxgrowth")
 	c.Cooloffduration, _ = time.ParseDuration(b.Conf.GetString("TradingRules.CoolOffDuration"))
-        c.base=b.Conf.GetString("Currency.Base")
+	c.base = b.Conf.GetString("Currency.Base")
 
 	// setup variables for loop
 	minbasetotrade := b.Conf.GetFloat64("TradingRules.minbasetotrade")
@@ -202,7 +202,7 @@ func (b *Bot) Train(traincoins string) {
 
 func (b *Bot) TrainPrepAnalysisData(coin string) AnalysisData {
 	tick := b.TrainingDataTick
-        pair:=Pair(c.base+"_"+coin)
+	pair := Pair(c.base + "_" + coin)
 	d := AnalysisData{
 
 		coin:          coin,
@@ -215,6 +215,7 @@ func (b *Bot) TrainPrepAnalysisData(coin string) AnalysisData {
 		sma:           b.MyTrainingData[pair][tick].Sma50,
 		ema:           b.MyTrainingData[pair][tick].Ema30,
 		currentprice:  b.MyTrainingData[pair][tick].Last,
+		lastprice:     b.State[coin].LastPrice,
 		coinbalance:   b.State[coin].Balance,
 		lastcoin:      b.State[LAST].Coin,
 		purchasedate:  b.State[coin].Date,
@@ -224,10 +225,11 @@ func (b *Bot) TrainPrepAnalysisData(coin string) AnalysisData {
 		purchaseprice: b.State[coin].PurchasePrice,
 	}
 
+	b.State[coin].LastPrice = d.currentprice
 	b.State[coin].LastEma = d.ema
 	b.State[coin].LastSma = d.sma
 	d.cooloffduration = c.Cooloffduration
-	d.analysisfunc = cacheAnalysisFunc
+	d.analysisfunc = c.AnalysisFunc
 
 	b.Now = time.Unix(b.MyTrainingData[pair][tick].Timestamp, 0) // convert time stamp to "now" time
 	CheckDuration(b.Now, b, &d)
@@ -236,16 +238,16 @@ func (b *Bot) TrainPrepAnalysisData(coin string) AnalysisData {
 }
 
 type confCache struct {
-	Cooloffduration time.Duration
-	AnalysisFunc    string
-	emaperiods      int
-	smaperiods      int
-	triggerbuy      float64
-	maxlosstorisk   float64
-	triggersell     float64
-	maxgrowth       float64
-	base            string
-     cacheAnalysisFunc string
+	Cooloffduration   time.Duration
+	AnalysisFunc      string
+	emaperiods        int
+	smaperiods        int
+	triggerbuy        float64
+	maxlosstorisk     float64
+	triggersell       float64
+	maxgrowth         float64
+	base              string
+	cacheAnalysisFunc string
 }
 
 var c confCache

@@ -15,32 +15,33 @@ func TestAnalyse(t *testing.T) {
 	JustNow := b.Now.Add(-time.Minute * 5)
 	Never := JustNow.Add(-time.Hour * 10000)
 
-	d := AnalysisData{
-		coin: "ETH",
-
-		emaperiods:    b.Conf.GetInt("Analysis.ema"),
-		smaperiods:    b.Conf.GetInt("Analysis.sma"),
-		triggerbuy:    b.Conf.GetFloat64("TradingRules.triggerbuy"),
-		maxlosstorisk: b.Conf.GetFloat64("TradingRules.maxlosstorisk"),
-		triggersell:   b.Conf.GetFloat64("TradingRules.triggersell"),
-		maxgrowth:     b.Conf.GetFloat64("TradingRules.maxgrowth"),
-
-		ema:          96,
-		sma:          90,
-		currentprice: 98,
-
-		coinbalance:   0,
-		lastcoin:      "STR",
-		purchasedate:  Never,
-		lastsold:      Never,
-		lastema:       95,
-		lastsma:       90,
-		purchaseprice: 0,
-	}
-	d.cooloffduration, _ = time.ParseDuration(b.Conf.GetString("TradingRules.CoolOffDuration"))
-
-	CheckDuration(b.Now, b, &d)
-
+// 	d := AnalysisData{
+// 		coin: "ETH",
+// 
+// 		emaperiods:    b.Conf.GetInt("Analysis.ema"),
+// 		smaperiods:    b.Conf.GetInt("Analysis.sma"),
+// 		triggerbuy:    b.Conf.GetFloat64("TradingRules.triggerbuy"),
+// 		maxlosstorisk: b.Conf.GetFloat64("TradingRules.maxlosstorisk"),
+// 		triggersell:   b.Conf.GetFloat64("TradingRules.triggersell"),
+// 		maxgrowth:     b.Conf.GetFloat64("TradingRules.maxgrowth"),
+// 
+// 		ema:          96,
+// 		sma:          90,
+// 		currentprice: 98,
+// 
+// 		coinbalance:   0,
+// 		lastcoin:      "STR",
+// 		purchasedate:  Never,
+// 		lastsold:      Never,
+// 		lastema:       95,
+// 		lastsma:       90,
+// 		purchaseprice: 0,
+// 	}
+// 	d.cooloffduration, _ = time.ParseDuration(b.Conf.GetString("TradingRules.CoolOffDuration"))
+// 
+// 	CheckDuration(b.Now, b, &d)
+        d:=newAnalysisData(b,JustNow,Never)
+        
 	Is(d.cooloffperiod, false, "Coin not held,Coin bought never, cool off false")
 	Is(d.HeldForLongEnough, false, "Coin not held,HeldForLongEnough false")
 
@@ -67,10 +68,8 @@ func TestAnalyse(t *testing.T) {
 	Is(d.HeldForLongEnough, false, "Coin not held,Coin sold ages ago, HeldForLongEnough  false")
 
 	// reset
-	d.coinbalance = 0
-	d.purchasedate = Never
-	d.lastsold = Never
-	CheckDuration(b.Now, b, &d)
+        d=newAnalysisData(b,JustNow,Never)
+        
 
 	// Test Analyse02
 	d.analysisfunc = "02"
@@ -121,6 +120,10 @@ func TestAnalyse(t *testing.T) {
 	action, ranking = b.Analyse(d)
 	Is(action, NOACTION, "Have bought but not ready to sell:Coin is recommended NoAction(0)")
 
+        // RESET
+        d=newAnalysisData(b,JustNow,Never)
+        d.analysisfunc = "02"
+        
 	// SELL
 	//     test should sell as have HeldForLongEnough
 	d.coinbalance = 1
@@ -138,6 +141,10 @@ func TestAnalyse(t *testing.T) {
 	action, ranking = b.Analyse(d)
 	Is(action, NOACTION, "dont sell as we bought lower and are good time window:Coin is recommended NOACTION")
 
+        // RESET
+        d=newAnalysisData(b,JustNow,Never)
+        d.analysisfunc = "02"
+        
 	//     test should sell as making too much loss
 	d.coinbalance = 1
 	d.purchaseprice = 98
@@ -148,7 +155,7 @@ func TestAnalyse(t *testing.T) {
 	Is(action, SELL, "should sell as making too much loss(maxlosstorisk and EMA/SMA trending down):Coin is recommended SELL")
 	d.currentprice = 97
 	action, ranking = b.Analyse(d)
-	Is(action, SELL, "should sell as making too much loss(less than pprice but not yet maxlosstorisk but ema/sma trending down):Coin is recommended SELL")
+	Is(action, SELL, "should sell as making too much loss(less than price but not yet maxlosstorisk but ema/sma trending down):Coin is recommended SELL")
 	d.currentprice = 98
 	action, ranking = b.Analyse(d)
 	Is(action, NOACTION, "should NOT sell as coin steady but ema/sma trending down:Coin is recommended NOACTION")
@@ -158,30 +165,33 @@ func TestAnalyse(t *testing.T) {
 	DoneTesting()
 }
 
-// type AnalysisData struct {
-// 	//	advice          int
-// 	//	ranking         float64
-// 	ema               float64
-// 	sma               float64
-// 	emaperiods        int
-// 	smaperiods        int
-// 	coin              string
-// 	coinbalance       float64
-// 	purchaseprice     float64
-// 	purchasedate      time.Time
-// 	lastsold          time.Time
-// 	lastcoin          string
-// 	cooloffperiod     bool
-// 	HeldForLongEnough bool
-// 	cooloffduration   time.Duration
-// 	currentprice      float64
-// 	maxholdduration   bool
-// 	lastema           float64
-// 	lastsma           float64
-// 	triggerbuy        float64
-// 	triggersell       float64
-// 	maxlosstorisk     float64
-// 	percentloss       float64
-// 	maxgrowth         float64
-// 	analysisfunc      string
-// }
+
+func newAnalysisData(b *Bot, JustNow, Never time.Time) (d AnalysisData) {
+    
+        d = AnalysisData{
+		coin: "ETH",
+
+		emaperiods:    b.Conf.GetInt("Analysis.ema"),
+		smaperiods:    b.Conf.GetInt("Analysis.sma"),
+		triggerbuy:    b.Conf.GetFloat64("TradingRules.triggerbuy"),
+		maxlosstorisk: b.Conf.GetFloat64("TradingRules.maxlosstorisk"),
+		triggersell:   b.Conf.GetFloat64("TradingRules.triggersell"),
+		maxgrowth:     b.Conf.GetFloat64("TradingRules.maxgrowth"),
+
+		ema:          96,
+		sma:          90,
+		currentprice: 98,
+
+		coinbalance:   0,
+		lastcoin:      "STR",
+		purchasedate:  Never,
+		lastsold:      Never,
+		lastema:       95,
+		lastsma:       90,
+		purchaseprice: 0,
+	}
+	d.cooloffduration, _ = time.ParseDuration(b.Conf.GetString("TradingRules.CoolOffDuration"))
+
+	CheckDuration(b.Now, b, &d)
+        return
+}

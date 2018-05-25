@@ -271,7 +271,7 @@ func (b *Bot) Analyse02(d AnalysisData) (advice action, ranking float64) {
 	ranking = 0
 
 	diff := d.ema - d.sma
-	anal := d.coin + " "
+	anal := d.coin + "(02) "
 	trendingdown := pdiff(d.ema, d.sma) < pdiff(d.lastema, d.lastsma)
 
 	b.LogInfo(anal)
@@ -289,6 +289,7 @@ func (b *Bot) Analyse02(d AnalysisData) (advice action, ranking float64) {
 	}
 	b.LogInfof(anal+"%v: sma(%v): %v ema(%v): %v diff: %v", direction, d.smaperiods, fc(d.sma), d.emaperiods, fc(d.ema), fc(diff))
 
+        // BUY ADVICE
 	if d.coinbalance == 0 {
 		// if last coin sold is this coin then do nothing (cooling off period)
 		if d.cooloffperiod {
@@ -312,6 +313,7 @@ func (b *Bot) Analyse02(d AnalysisData) (advice action, ranking float64) {
 		return
 	}
 
+	// SELL ADVICE
 	percentloss := (d.currentprice - d.purchaseprice) / d.purchaseprice
 	pl := percentloss
 	if percentloss > 0 {
@@ -326,11 +328,6 @@ func (b *Bot) Analyse02(d AnalysisData) (advice action, ranking float64) {
 		return
 	}
 
-	// 	if d.coinbalance > 0 && diff/d.sma < d.triggersell {
-	// 		advice = SELL
-	// 		b.LogInfof(anal+"ADVICE SELL as ema-sma/sma %v is less than triggersell %v\n", fp(diff/d.sma), fp(d.triggersell))
-	// 		return
-	// 	}
 	if d.coinbalance > 0 && d.ema < d.sma {
 		// coin is trending down in value
 		// TODO CARE NEEDED HERE!
@@ -340,12 +337,6 @@ func (b *Bot) Analyse02(d AnalysisData) (advice action, ranking float64) {
 			b.LogInfof(anal+"ADVICE Recommend SELL as loss %v %% is more than maxlosstorisk %v %%\n", fp2(percentloss), fp2(d.maxlosstorisk))
 			return
 		}
-		// 				if percentloss < maxlosstorisk  {
-		// 					advice = SELL
-		// 					b.LogInfof(anal+"ADVICE Recommend SELL as loss %v %% is less than maxlosstorisk %v %%\n", fp2(percentloss), fp2(d.maxlosstorisk))
-		// 					return
-		// 				}
-		// current price > purchase price info - keep - coin is growing in value
 		if percentloss == 0 {
 			b.LogWarning(anal + "ADVICE NOACTION Coin is in profit and growing in value but trending down")
 			return
@@ -353,12 +344,6 @@ func (b *Bot) Analyse02(d AnalysisData) (advice action, ranking float64) {
 		// current price > purchase price + max allowed growth - sell (get out on top)
 
 	}
-	// 	growth := (d.currentprice - d.purchaseprice) / d.purchaseprice
-	// 	if d.coinbalance > 0 && growth > d.maxgrowth {
-	// 		b.LogInfof(anal+"ADVICE SELL:  %v times greater than purchase price - triggered maxgrowth %v\n", fn(growth), fn(d.maxgrowth))
-	// 		advice = SELL
-	// 		return
-	// 	}
 	b.LogInfo(anal + "ADVICE Nothing to do. No concerns")
 	return
 }

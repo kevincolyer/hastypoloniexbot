@@ -75,13 +75,23 @@ func (b *Bot) PrepAnalysisData(coin string) AnalysisData {
 	d.cooloffduration, _ = time.ParseDuration(b.Conf.GetString("TradingRules.CoolOffDuration"))
 	// store current time (used to fake time for training data)
 	b.Now = time.Now()
-	if d.coinbalance == 0 && d.lastsold.After(b.Now.Add(-d.cooloffduration)) {
-		d.cooloffperiod = true
-	}
-
-	d.HeldForLongEnough = d.purchasedate.After(b.Now.Add(-time.Hour * 22)) // yuk
+	CheckDuration(b.Now, b, &d)
 
 	return d
+}
+
+func CheckDuration(now time.Time, b *Bot, d *AnalysisData) {
+	// set to true if NOT holding coin AND last sold is NOT Before now less cool off duration
+	//     endofcooling:=d.lastsold.Add(time.Hour*2)
+	endofcooling := d.lastsold.Add(d.cooloffduration)
+	if d.coinbalance == 0 && now.Before(endofcooling) {
+		d.cooloffperiod = true
+	} else {
+		d.cooloffperiod = false
+	}
+	// set to true if purchase date is before now less 22 hours AND we are holding coin!
+	twentytwohoursago := now.Add(-time.Hour * 22)
+	d.HeldForLongEnough = d.purchasedate.Before(twentytwohoursago) && d.coinbalance > 0 // yuk
 }
 
 type AnalysisData struct {
@@ -101,15 +111,15 @@ type AnalysisData struct {
 	HeldForLongEnough bool
 	cooloffduration   time.Duration
 	currentprice      float64
-	maxholdduration   bool
-	lastema           float64
-	lastsma           float64
-	triggerbuy        float64
-	triggersell       float64
-	maxlosstorisk     float64
-	percentloss       float64
-	maxgrowth         float64
-	analysisfunc      string
+	//maxholdduration   bool
+	lastema       float64
+	lastsma       float64
+	triggerbuy    float64
+	triggersell   float64
+	maxlosstorisk float64
+	percentloss   float64
+	maxgrowth     float64
+	analysisfunc  string
 }
 
 // helper function to arrange chart data for ema/sma calcs
@@ -238,12 +248,12 @@ func (b *Bot) Analyse01(d AnalysisData) (advice action, ranking float64) {
 		// current price > purchase price + max allowed growth - sell (get out on top)
 
 	}
-	growth := (d.currentprice - d.purchaseprice) / d.purchaseprice
-	if d.coinbalance > 0 && growth > d.maxgrowth {
-		b.LogInfof(anal+"ADVICE SELL:  %v times greater than purchase price - triggered maxgrowth %v\n", fn(growth), fn(d.maxgrowth))
-		advice = SELL
-		return
-	}
+	// 	growth := (d.currentprice - d.purchaseprice) / d.purchaseprice
+	// 	if d.coinbalance > 0 && growth > d.maxgrowth {
+	// 		b.LogInfof(anal+"ADVICE SELL:  %v times greater than purchase price - triggered maxgrowth %v\n", fn(growth), fn(d.maxgrowth))
+	// 		advice = SELL
+	// 		return
+	// 	}
 	if d.coinbalance > 0 && d.HeldForLongEnough {
 		b.LogInfof(anal + "ADVICE SELL: Held for long enough threshold exceeded.\n")
 		advice = SELL
@@ -285,7 +295,7 @@ func (b *Bot) Analyse02(d AnalysisData) (advice action, ranking float64) {
 
 		ranking = diff / d.sma
 		// if ema<sma advice nothing return
-		if d.ema < d.sma {
+		if d.ema <= d.sma {
 			b.LogInfof(anal+"ADVICE Not a good buy - coin trending down. ema is less than sma: %v %%", fp2(ranking))
 			return
 		}
@@ -307,20 +317,31 @@ func (b *Bot) Analyse02(d AnalysisData) (advice action, ranking float64) {
 	// sell if trending down (buy back should be delayed a few hours)
 	b.LogInfof(anal+"PurchasePrice %v currentprice %v percentloss %v %v purchasedate %v lastsale %v \n", fc(d.purchaseprice), fc(d.currentprice), fn(percentloss), fn(pl), d.purchasedate, d.lastsold)
 
-	if d.coinbalance > 0 && diff/d.sma < d.triggersell {
+	if d.coinbalance > 0 && d.HeldForLongEnough {
+		b.LogInfof(anal + "ADVICE SELL: Held for long enough threshold exceeded.\n")
 		advice = SELL
-		b.LogInfof(anal+"ADVICE SELL as ema-sma/sma %v is less than triggersell %v\n", fp(diff/d.sma), fp(d.triggersell))
 		return
 	}
+
+	// 	if d.coinbalance > 0 && diff/d.sma < d.triggersell {
+	// 		advice = SELL
+	// 		b.LogInfof(anal+"ADVICE SELL as ema-sma/sma %v is less than triggersell %v\n", fp(diff/d.sma), fp(d.triggersell))
+	// 		return
+	// 	}
 	if d.coinbalance > 0 && d.ema < d.sma {
 		// coin is trending down in value
 		// TODO CARE NEEDED HERE!
 		// curent price < purchase price-allowable loss the advice = sell
-		// 		if percentloss < 0 && -percentloss > d.maxlosstorisk {
-		// 			advice = SELL
-		// 			b.LogInfof(anal+"ADVICE Recommend SELL as loss %v %% is less than maxlosstorisk %v %%\n", fp2(percentloss), fp2(d.maxlosstorisk))
-		// 			return
-		// 		}
+		if percentloss < 0 && -percentloss > d.maxlosstorisk {
+			advice = SELL
+			b.LogInfof(anal+"ADVICE Recommend SELL as loss %v %% is more than maxlosstorisk %v %%\n", fp2(percentloss), fp2(d.maxlosstorisk))
+			return
+		}
+		// 				if percentloss < maxlosstorisk  {
+		// 					advice = SELL
+		// 					b.LogInfof(anal+"ADVICE Recommend SELL as loss %v %% is less than maxlosstorisk %v %%\n", fp2(percentloss), fp2(d.maxlosstorisk))
+		// 					return
+		// 				}
 		// current price > purchase price info - keep - coin is growing in value
 		if percentloss == 0 {
 			b.LogWarning(anal + "ADVICE NOACTION Coin is in profit and growing in value but trending down")
@@ -332,11 +353,6 @@ func (b *Bot) Analyse02(d AnalysisData) (advice action, ranking float64) {
 	// 	growth := (d.currentprice - d.purchaseprice) / d.purchaseprice
 	// 	if d.coinbalance > 0 && growth > d.maxgrowth {
 	// 		b.LogInfof(anal+"ADVICE SELL:  %v times greater than purchase price - triggered maxgrowth %v\n", fn(growth), fn(d.maxgrowth))
-	// 		advice = SELL
-	// 		return
-	// 	}
-	// 	if d.coinbalance > 0 && d.HeldForLongEnough {
-	// 		b.LogInfof(anal + "ADVICE SELL: Held for long enough threshold exceeded.\n")
 	// 		advice = SELL
 	// 		return
 	// 	}
